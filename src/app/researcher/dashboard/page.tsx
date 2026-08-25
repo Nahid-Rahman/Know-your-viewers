@@ -7,16 +7,25 @@ import { BarChartCard } from "@/components/charts/bar-chart-card";
 import { LineChartCard } from "@/components/charts/line-chart-card";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { mockExperiments, mockDisclosureByCondition, mockFunnel } from "@/lib/mock/research";
+import { requireRoleOrRedirect } from "@/lib/auth";
+import { getExperiments, getFunnel } from "@/lib/queries/research";
 
 export const metadata = { title: "Researcher Dashboard | LiveDrop Arena" };
 
-export default function ResearcherDashboardPage() {
-  const activeExperiments = mockExperiments.filter((e) => e.status === "ACTIVE");
-  const totalParticipants = mockExperiments.reduce((sum, e) => sum + e.participantCount, 0);
+export default async function ResearcherDashboardPage() {
+  const researcher = await requireRoleOrRedirect("RESEARCHER");
+  const experiments = await getExperiments(researcher.id);
+  const activeExperiment = experiments.find((e) => e.status === "ACTIVE");
+  const funnel = activeExperiment ? await getFunnel(activeExperiment.id) : [];
+  const disclosureByCondition = activeExperiment
+    ? activeExperiment.conditions.map((c) => ({ name: c.name, disclosureRate: c.disclosureRate }))
+    : [];
+
+  const activeExperiments = experiments.filter((e) => e.status === "ACTIVE");
+  const totalParticipants = experiments.reduce((sum, e) => sum + e.participantCount, 0);
   const avgCompletion =
-    mockExperiments.filter((e) => e.participantCount > 0).reduce((s, e) => s + e.completionRate, 0) /
-    Math.max(mockExperiments.filter((e) => e.participantCount > 0).length, 1);
+    experiments.filter((e) => e.participantCount > 0).reduce((s, e) => s + e.completionRate, 0) /
+    Math.max(experiments.filter((e) => e.participantCount > 0).length, 1);
 
   return (
     <div>
@@ -34,14 +43,14 @@ export default function ResearcherDashboardPage() {
         <StatCard label="Active Experiments" value={activeExperiments.length} icon={<FlaskConical className="size-4" />} tone="violet" />
         <StatCard label="Total Participants" value={totalParticipants.toLocaleString()} icon={<Users className="size-4" />} tone="cyan" />
         <StatCard label="Avg. Completion Rate" value={`${avgCompletion.toFixed(0)}%`} icon={<TrendingUp className="size-4" />} tone="green" />
-        <StatCard label="Ethics-Approved Studies" value={mockExperiments.filter((e) => e.ethicsApprovalRef).length} icon={<ShieldCheck className="size-4" />} tone="primary" />
+        <StatCard label="Ethics-Approved Studies" value={experiments.filter((e) => e.ethicsApprovalRef).length} icon={<ShieldCheck className="size-4" />} tone="primary" />
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <BarChartCard
           title="Contact disclosure rate by condition"
           description="Persuasion Cues in Viewer Reward Recruitment"
-          data={mockDisclosureByCondition}
+          data={disclosureByCondition}
           dataKey="disclosureRate"
           categoryKey="name"
           horizontal
@@ -49,7 +58,7 @@ export default function ResearcherDashboardPage() {
         <LineChartCard
           title="Participation funnel"
           description="From landing to granted research permission"
-          data={mockFunnel.map((f) => ({ stage: f.stage, count: f.count }))}
+          data={funnel.map((f) => ({ stage: f.stage, count: f.count }))}
           dataKey="count"
           categoryKey="stage"
         />
@@ -63,7 +72,7 @@ export default function ResearcherDashboardPage() {
           </Link>
         </div>
         <div className="divide-y divide-border">
-          {mockExperiments.map((exp) => (
+          {experiments.map((exp) => (
             <Link
               key={exp.id}
               href={`/researcher/experiments/${exp.id}`}

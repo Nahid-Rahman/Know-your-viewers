@@ -1,16 +1,22 @@
 import { notFound } from "next/navigation";
 import { CalendarDays, ShieldAlert, ShieldCheck, Users } from "lucide-react";
 import { StatCard } from "@/components/common/stat-card";
-import { getExperimentById, mockStreamers } from "@/lib/mock/research";
+import { ConfirmDeleteButton } from "@/components/common/confirm-delete-button";
+import { ExperimentStatusControl } from "@/features/experiment/experiment-status-control";
+import { ExperimentEditDialog } from "@/features/experiment/experiment-edit-dialog";
+import { StreamerAssignmentPanel } from "@/features/experiment/streamer-assignment-panel";
+import { Button } from "@/components/ui/button";
+import { deleteExperiment } from "@/lib/actions/experiments";
+import { getExperimentById, getStreamers } from "@/lib/queries/research";
 
 export default async function ExperimentOverviewPage({
   params,
 }: PageProps<"/researcher/experiments/[id]">) {
   const { id } = await params;
-  const experiment = getExperimentById(id);
+  const experiment = await getExperimentById(id);
   if (!experiment) notFound();
 
-  const assignedStreamers = mockStreamers.filter((s) => experiment.assignedStreamerIds.includes(s.id));
+  const streamers = await getStreamers();
 
   return (
     <div>
@@ -23,7 +29,21 @@ export default async function ExperimentOverviewPage({
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
           <div className="rounded-xl border border-border bg-card p-5">
-            <p className="mb-2 font-semibold">Description</p>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="font-semibold">Description</p>
+              <ExperimentEditDialog
+                experimentId={experiment.id}
+                defaultValues={{
+                  title: experiment.title,
+                  description: experiment.description,
+                  objective: experiment.objective,
+                  startDate: experiment.startDate,
+                  endDate: experiment.endDate ?? "",
+                  ethicsApprovalRef: experiment.ethicsApprovalRef ?? "",
+                }}
+                trigger={<Button variant="outline" size="sm">Edit</Button>}
+              />
+            </div>
             <p className="text-sm text-muted-foreground">{experiment.description}</p>
             <p className="mt-4 mb-2 font-semibold">Research Objective</p>
             <p className="text-sm text-muted-foreground">{experiment.objective}</p>
@@ -31,21 +51,29 @@ export default async function ExperimentOverviewPage({
 
           <div className="rounded-xl border border-border bg-card p-5">
             <p className="mb-3 font-semibold">Assigned Streamers</p>
-            {assignedStreamers.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No streamers assigned yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {assignedStreamers.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between rounded-lg border border-border bg-secondary/30 px-3 py-2">
-                    <div>
-                      <p className="text-sm font-medium">{s.displayName}</p>
-                      <p className="text-xs text-muted-foreground">{s.platform} &bull; {s.category}</p>
-                    </div>
-                    <span className="text-xs text-muted-foreground">{s.totalClicks.toLocaleString()} clicks</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            <StreamerAssignmentPanel
+              experimentId={experiment.id}
+              allStreamers={streamers}
+              assignedStreamerIds={experiment.assignedStreamerIds}
+            />
+          </div>
+
+          <div className="rounded-xl border border-destructive/25 bg-destructive/5 p-5">
+            <p className="mb-1 font-semibold text-destructive">Danger zone</p>
+            <p className="mb-3 text-sm text-muted-foreground">
+              Permanently deletes this experiment and every participant, response, and event
+              recorded under it. This cannot be undone.
+            </p>
+            <ConfirmDeleteButton
+              label="Delete Experiment"
+              triggerVariant="destructive"
+              triggerSize="sm"
+              confirmTitle="Delete this experiment?"
+              confirmDescription={`This permanently deletes "${experiment.title}" and all of its participants, responses, and engagement events.`}
+              requireTypedConfirmation={experiment.title}
+              redirectTo="/researcher/experiments"
+              onConfirm={() => deleteExperiment(experiment.id)}
+            />
           </div>
         </div>
 
@@ -90,6 +118,11 @@ export default async function ExperimentOverviewPage({
                 "Not on file — this experiment cannot be set to Active until an approval reference is recorded."
               )}
             </p>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-5">
+            <p className="mb-3 font-semibold">Status</p>
+            <ExperimentStatusControl experimentId={experiment.id} status={experiment.status} />
           </div>
         </div>
       </div>

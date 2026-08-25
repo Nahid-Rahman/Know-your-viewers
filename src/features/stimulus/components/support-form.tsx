@@ -12,6 +12,7 @@ import {
   LightTextarea,
   LightFieldLabel,
 } from "@/components/common/light-field";
+import { submitSupportRequest } from "@/lib/actions/support";
 
 const ISSUE_TYPES = [
   "Entry follow-up / status check",
@@ -44,10 +45,15 @@ export function SupportForm() {
     },
   });
 
-  async function onSubmit() {
+  async function onSubmit(values: SupportValues) {
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 500));
+    const result = await submitSupportRequest(values);
     setSubmitting(false);
+
+    if ("error" in result) {
+      toast.error(result.error);
+      return;
+    }
     toast.success("Support request sent. Our team will follow up shortly.");
     form.reset();
   }

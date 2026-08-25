@@ -4,9 +4,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { faqItems } from "@/features/stimulus/config";
-
-export function FaqSection() {
+export function FaqSection({ faqItems }: { faqItems: { q: string; a: string }[] }) {
   return (
     <section id="faq" className="mx-auto w-full max-w-3xl scroll-mt-[69px] px-4 py-16 sm:px-6">
       <div className="mb-10 text-center">

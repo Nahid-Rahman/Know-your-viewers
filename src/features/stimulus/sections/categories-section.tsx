@@ -4,9 +4,12 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { EyebrowLabel } from "@/components/common/eyebrow-label";
 import { cn } from "@/lib/utils";
-import { gameCategories } from "@/features/stimulus/config";
 
-export function CategoriesSection() {
+export function CategoriesSection({
+  gameCategories,
+}: {
+  gameCategories: { tag: string; title: string; description: string }[];
+}) {
   const [active, setActive] = useState(0);
   const count = gameCategories.length;
 

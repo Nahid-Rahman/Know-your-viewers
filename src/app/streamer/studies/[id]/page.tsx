@@ -2,18 +2,20 @@ import { notFound } from "next/navigation";
 import { ShieldCheck, Info } from "lucide-react";
 import { StatCard } from "@/components/common/stat-card";
 import { CopyableCode } from "@/components/common/copyable-code";
-import { getExperimentById, mockTrackingLinks } from "@/lib/mock/research";
-
-const CURRENT_STREAMER_ID = "str_1";
+import { requireRoleOrRedirect } from "@/lib/auth";
+import { getExperimentById, getStreamerByUserId, getTrackingLinks } from "@/lib/queries/research";
 
 export default async function StreamerStudyDetailPage({
   params,
 }: PageProps<"/streamer/studies/[id]">) {
   const { id } = await params;
-  const experiment = getExperimentById(id);
-  if (!experiment || !experiment.assignedStreamerIds.includes(CURRENT_STREAMER_ID)) notFound();
+  const user = await requireRoleOrRedirect("STREAMER");
+  const streamer = await getStreamerByUserId(user.id);
+  const experiment = await getExperimentById(id);
+  if (!experiment || !streamer || !experiment.assignedStreamerIds.includes(streamer.id)) notFound();
 
-  const link = mockTrackingLinks.find((l) => l.experimentId === id && l.streamerId === CURRENT_STREAMER_ID);
+  const links = await getTrackingLinks(id);
+  const link = links.find((l) => l.streamerId === streamer.id);
 
   return (
     <div>

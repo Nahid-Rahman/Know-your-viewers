@@ -6,9 +6,11 @@ import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { register } from "@/lib/actions/auth";
 import {
   Select,
   SelectContent,
@@ -37,9 +39,19 @@ export default function RegisterPage() {
 
   async function onSubmit(values: RegisterValues) {
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 500));
-    // Phase 5 wires this to Supabase Auth (create user + mirrored User row).
-    router.push(values.role === "RESEARCHER" ? "/researcher/dashboard" : "/streamer/dashboard");
+    const result = await register(values);
+    setSubmitting(false);
+
+    if ("error" in result) {
+      toast.error(result.error);
+      return;
+    }
+    if ("needsEmailConfirmation" in result) {
+      toast.success("Account created. Check your email to confirm it before signing in.");
+      router.push("/login");
+      return;
+    }
+    router.push(result.role === "RESEARCHER" ? "/researcher/dashboard" : "/streamer/dashboard");
   }
 
   return (

@@ -6,9 +6,11 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { login } from "@/lib/actions/auth";
 
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email address."),
@@ -26,11 +28,16 @@ export default function LoginPage() {
     defaultValues: { email: "", password: "" },
   });
 
-  async function onSubmit() {
+  async function onSubmit(values: LoginValues) {
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 500));
-    // Phase 5 wires this to Supabase Auth and redirects by the user's real role.
-    router.push("/researcher/dashboard");
+    const result = await login(values);
+    setSubmitting(false);
+
+    if ("error" in result) {
+      toast.error(result.error);
+      return;
+    }
+    router.push(result.role === "RESEARCHER" ? "/researcher/dashboard" : "/streamer/dashboard");
   }
 
   return (

@@ -171,6 +171,9 @@ model Participant {
   trackingLinkId String?
   anonymousCode  String        @unique
   consentStatus  ConsentStatus @default(PENDING)
+  // Which reward the roulette showed/awarded this participant at claim time.
+  rewardLabel    String?
+  rewardRarity   Rarity?
   createdAt      DateTime      @default(now())
 
   experiment   Experiment    @relation(fields: [experimentId], references: [id], onDelete: Cascade)
@@ -179,11 +182,12 @@ model Participant {
 
   // Contact details live in a separate, independently-deletable table —
   // never joined into analytics queries.
-  contact  ParticipantContact?
-  consent  Consent?
-  debrief  Debrief?
-  responses Response[]
-  events   EngagementEvent[]
+  contact         ParticipantContact?
+  consent         Consent?
+  debrief         Debrief?
+  responses       Response[]
+  events          EngagementEvent[]
+  supportRequests SupportRequest[]
 
   @@index([experimentId])
   @@index([conditionId])
@@ -333,4 +337,50 @@ model EngagementEvent {
 
   @@index([participantId])
   @@map("engagement_events")
+}
+
+// ---------------------------------------------------------------------------
+// Stimulus content — editable copy for the public participant-facing pages.
+// Singleton row (id is always "singleton"); config.ts holds the seed-time
+// defaults only, this table is the runtime source of truth.
+// ---------------------------------------------------------------------------
+
+model SiteContent {
+  id                    String   @id @default("singleton")
+  heroHeadline          String
+  heroSubtext           String
+  claimedCount          String
+  countdownSeconds      Int
+  trustBadges           Json // { icon, title, description }[]
+  gameCategories        Json // { tag, title, description }[]
+  rewardPool            Json // { label, sub, rarity }[]
+  gameTypeOptions       Json // string[]
+  watchFrequencyOptions Json // string[]
+  faqItems              Json // { q, a }[]
+  updatedAt             DateTime @updatedAt
+
+  @@map("site_content")
+}
+
+// ---------------------------------------------------------------------------
+// Support
+// ---------------------------------------------------------------------------
+
+// Participant-initiated contact-support requests from the stimulus/support
+// page. Kept separate from ParticipantContact — support messages are
+// operational, not behavioural research data.
+model SupportRequest {
+  id                String       @id @default(uuid())
+  participantId     String?
+  emailOrPhone      String
+  responseCode      String?
+  streamNickname    String?
+  issueType         String
+  message           String
+  createdAt         DateTime     @default(now())
+
+  participant Participant? @relation(fields: [participantId], references: [id], onDelete: SetNull)
+
+  @@index([participantId])
+  @@map("support_requests")
 }

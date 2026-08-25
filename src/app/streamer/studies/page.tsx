@@ -2,14 +2,16 @@ import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatusBadge } from "@/components/common/status-badge";
 import { EmptyState } from "@/components/common/empty-state";
-import { mockExperiments } from "@/lib/mock/research";
-
-const CURRENT_STREAMER_ID = "str_1";
+import { requireRoleOrRedirect } from "@/lib/auth";
+import { getExperiments, getStreamerByUserId } from "@/lib/queries/research";
 
 export const metadata = { title: "Assigned Studies | LiveDrop Arena" };
 
-export default function StreamerStudiesPage() {
-  const assigned = mockExperiments.filter((e) => e.assignedStreamerIds.includes(CURRENT_STREAMER_ID));
+export default async function StreamerStudiesPage() {
+  const user = await requireRoleOrRedirect("STREAMER");
+  const streamer = await getStreamerByUserId(user.id);
+  const allExperiments = await getExperiments();
+  const assigned = allExperiments.filter((e) => e.assignedStreamerIds.includes(streamer?.id ?? ""));
 
   return (
     <div>

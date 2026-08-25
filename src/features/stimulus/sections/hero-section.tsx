@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { EyebrowLabel } from "@/components/common/eyebrow-label";
 import { CountdownChip } from "@/components/common/countdown-chip";
@@ -5,11 +6,37 @@ import { RewardOrb } from "@/components/common/reward-orb";
 import { HeroContactCard } from "@/features/stimulus/components/hero-contact-card";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { defaultStimulusConfig } from "@/features/stimulus/config";
+import type { StimulusRuntimeConfig } from "@/features/stimulus/config";
 
-export function HeroSection() {
-  const config = defaultStimulusConfig;
+/** Renders editable headline copy: "\n" breaks lines, **text** gets the gradient highlight. */
+function HeroHeadline({ text }: { text: string }) {
+  return (
+    <>
+      {text.split("\n").map((line, i) => (
+        <Fragment key={i}>
+          {i > 0 && <br />}
+          {line.split(/(\*\*[^*]+\*\*)/g).map((part, j) =>
+            part.startsWith("**") && part.endsWith("**") ? (
+              <span key={j} className="text-gradient-primary">
+                {part.slice(2, -2)}
+              </span>
+            ) : (
+              <Fragment key={j}>{part}</Fragment>
+            ),
+          )}
+        </Fragment>
+      ))}
+    </>
+  );
+}
 
+export function HeroSection({
+  config,
+  content,
+}: {
+  config: StimulusRuntimeConfig;
+  content: { heroHeadline: string; heroSubtext: string; claimedCount: string; countdownSeconds: number };
+}) {
   return (
     <section className="relative overflow-hidden">
       <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-16 sm:px-6 md:grid-cols-2 md:items-center md:py-24">
@@ -19,23 +46,14 @@ export function HeroSection() {
           )}
 
           <h1 className="font-display text-5xl leading-[1.05] font-bold sm:text-6xl">
-            UNLOCK
-            <br />
-            YOUR
-            <br />
-            <span className="text-gradient-primary">VIEWER DROP</span>
-            <br />
-            TODAY!
+            <HeroHeadline text={content.heroHeadline} />
           </h1>
 
-          <p className="mt-5 max-w-md text-muted-foreground">
-            Spin the reward roll for a chance to unlock exclusive viewer bonuses before the
-            event closes. Verified event access. No password required.
-          </p>
+          <p className="mt-5 max-w-md text-muted-foreground">{content.heroSubtext}</p>
 
           {config.urgencyEnabled && (
             <div className="mt-6">
-              <CountdownChip durationSeconds={config.countdownSeconds} />
+              <CountdownChip durationSeconds={content.countdownSeconds} />
             </div>
           )}
 
@@ -53,7 +71,7 @@ export function HeroSection() {
 
           {config.socialProofEnabled && (
             <p className="mt-6 text-sm text-muted-foreground">
-              <span className="font-semibold text-foreground">{config.claimedCount}</span> players
+              <span className="font-semibold text-foreground">{content.claimedCount}</span> players
               have already claimed rewards
             </p>
           )}

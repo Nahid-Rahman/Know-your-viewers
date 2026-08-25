@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { createExperiment } from "@/lib/actions/experiments";
 
 const experimentSchema = z.object({
   title: z.string().min(4, "Give the study a descriptive title."),
@@ -41,14 +42,19 @@ export default function NewExperimentPage() {
 
   async function onSubmit(values: ExperimentValues) {
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 600));
+    const result = await createExperiment(values);
     setSubmitting(false);
+
+    if ("error" in result) {
+      toast.error(result.error);
+      return;
+    }
     if (!values.ethicsApprovalRef) {
       toast.warning("Saved as Draft. An ethics approval reference is required before this can go Active.");
     } else {
       toast.success("Experiment created.");
     }
-    router.push("/researcher/experiments");
+    router.push(`/researcher/experiments/${result.experimentId}`);
   }
 
   return (

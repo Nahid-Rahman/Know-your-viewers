@@ -13,11 +13,13 @@ import {
 } from "@/components/ui/table";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { mockExperiments } from "@/lib/mock/research";
+import { getExperiments } from "@/lib/queries/research";
 
 export const metadata = { title: "Experiments | LiveDrop Arena" };
 
-export default function ExperimentsPage() {
+export default async function ExperimentsPage() {
+  const experiments = await getExperiments();
+
   return (
     <div>
       <PageHeader
@@ -33,7 +35,7 @@ export default function ExperimentsPage() {
         }
       />
 
-      {mockExperiments.length === 0 ? (
+      {experiments.length === 0 ? (
         <EmptyState
           icon={<FlaskConical className="size-5" />}
           title="No experiments yet"
@@ -58,7 +60,7 @@ export default function ExperimentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockExperiments.map((exp) => (
+              {experiments.map((exp) => (
                 <TableRow key={exp.id} className="cursor-pointer">
                   <TableCell>
                     <Link href={`/researcher/experiments/${exp.id}`} className="font-medium hover:text-primary">

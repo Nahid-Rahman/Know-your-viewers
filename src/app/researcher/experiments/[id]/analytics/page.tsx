@@ -2,20 +2,24 @@ import { notFound } from "next/navigation";
 import { BarChartCard } from "@/components/charts/bar-chart-card";
 import { LineChartCard } from "@/components/charts/line-chart-card";
 import { DistributionChart } from "@/components/charts/distribution-chart";
-import { getExperimentById, mockFunnel } from "@/lib/mock/research";
+import { getExperimentById, getFunnel } from "@/lib/queries/research";
 
 export default async function AnalyticsPage({
   params,
 }: PageProps<"/researcher/experiments/[id]/analytics">) {
   const { id } = await params;
-  const experiment = getExperimentById(id);
+  const experiment = await getExperimentById(id);
   if (!experiment) notFound();
+
+  const funnel = await getFunnel(id);
 
   const disclosureData = experiment.conditions.map((c) => ({
     name: c.name,
     disclosureRate: c.disclosureRate,
   }));
 
+  // Not yet backed by real survey analytics — the post-study survey's LIKERT
+  // trust question isn't aggregated into this shape. Placeholder pending that.
   const trustDistribution = [
     { label: "Not at all", count: 62 },
     { label: "Slightly", count: 118 },
@@ -41,7 +45,7 @@ export default async function AnalyticsPage({
         />
         <LineChartCard
           title="Participation funnel"
-          data={mockFunnel.map((f) => ({ stage: f.stage, count: f.count }))}
+          data={funnel.map((f) => ({ stage: f.stage, count: f.count }))}
           dataKey="count"
           categoryKey="stage"
         />

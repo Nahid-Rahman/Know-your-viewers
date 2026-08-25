@@ -2,14 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StatusBadge } from "@/components/common/status-badge";
 import { ExperimentTabs } from "@/features/experiment/experiment-tabs";
-import { getExperimentById } from "@/lib/mock/research";
+import { getExperimentById } from "@/lib/queries/research";
 
 export default async function ExperimentDetailLayout({
   children,
   params,
 }: LayoutProps<"/researcher/experiments/[id]">) {
   const { id } = await params;
-  const experiment = getExperimentById(id);
+  const experiment = await getExperimentById(id);
   if (!experiment) notFound();
 
   return (

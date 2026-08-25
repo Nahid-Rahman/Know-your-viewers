@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { ShieldAlert, Info, ArrowRight, ArrowLeft } from "lucide-react";
 import { EyebrowLabel } from "@/components/common/eyebrow-label";
 import { GlowCard } from "@/components/common/glow-card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { getNextSurveyId, logEngagementEvent, submitDebrief } from "@/lib/actions/participant";
 
 const SIMULATED_ELEMENTS = [
   "The countdown timer did not represent a real deadline.",
@@ -19,9 +21,22 @@ const SIMULATED_ELEMENTS = [
 export default function DebriefPage() {
   const router = useRouter();
   const [answered, setAnswered] = useState<"granted" | "declined" | null>(null);
+  const [navigating, setNavigating] = useState(false);
 
-  function respond(choice: "granted" | "declined") {
+  useEffect(() => {
+    void logEngagementEvent("PAGE_VIEW");
+  }, []);
+
+  async function respond(choice: "granted" | "declined") {
     setAnswered(choice);
+    const result = await submitDebrief(choice === "granted");
+    if ("error" in result) toast.error(result.error);
+  }
+
+  async function continueToSurvey() {
+    setNavigating(true);
+    const surveyId = await getNextSurveyId();
+    router.push(surveyId ? `/survey/${surveyId}` : "/");
   }
 
   return (
@@ -104,7 +119,8 @@ export default function DebriefPage() {
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
           <Button
             className="h-11 flex-1 bg-gradient-primary text-white hover:opacity-90"
-            onClick={() => router.push("/survey/post-study")}
+            disabled={navigating}
+            onClick={continueToSurvey}
           >
             Continue to a short optional survey
             <ArrowRight data-icon="inline-end" />

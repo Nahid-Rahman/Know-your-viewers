@@ -1,9 +1,12 @@
 "use client";
 
 /**
- * Browser-only holding area for the entry just submitted, so both the
- * hero's "contact for follow-up" card and the confirmation screen have
- * something to render before Phase 6 wires this to a real server action.
+ * Browser-only holding area for the entry just submitted, so the hero's
+ * "contact for follow-up" card and the confirmation screen can echo it back
+ * immediately. The real submission is persisted via submitEntry()
+ * (src/lib/actions/participant.ts) — this store only redisplays it, since
+ * decrypting ParticipantContact for display is deliberately never done
+ * (see src/lib/crypto.ts).
  */
 export type MockEntry = {
   responseCode: string;
@@ -63,11 +66,4 @@ export function loadMockEntry(): MockEntry | null {
     }
   }
   return cachedEntry;
-}
-
-export function generateResponseCode() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let suffix = "";
-  for (let i = 0; i < 4; i++) suffix += chars[Math.floor(Math.random() * chars.length)];
-  return `LDA-${suffix}`;
 }

@@ -3,16 +3,21 @@ import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { StatCard } from "@/components/common/stat-card";
 import { StatusBadge } from "@/components/common/status-badge";
-import { getStreamerById, mockExperiments } from "@/lib/mock/research";
+import { Button } from "@/components/ui/button";
+import { ConfirmDeleteButton } from "@/components/common/confirm-delete-button";
+import { StreamerEditDialog } from "@/features/streamer/streamer-edit-dialog";
+import { deleteStreamer } from "@/lib/actions/streamers";
+import { getStreamerById, getExperiments } from "@/lib/queries/research";
 
 export default async function StreamerDetailPage({
   params,
 }: PageProps<"/researcher/streamers/[id]">) {
   const { id } = await params;
-  const streamer = getStreamerById(id);
+  const streamer = await getStreamerById(id);
   if (!streamer) notFound();
 
-  const experiments = mockExperiments.filter((e) => e.assignedStreamerIds.includes(id));
+  const allExperiments = await getExperiments();
+  const experiments = allExperiments.filter((e) => e.assignedStreamerIds.includes(id));
 
   return (
     <div>
@@ -27,7 +32,28 @@ export default async function StreamerDetailPage({
             <ExternalLink className="size-3" />
           </a>
         </div>
-        <StatusBadge status={streamer.status} />
+        <div className="flex items-center gap-2">
+          <StatusBadge status={streamer.status} />
+          <StreamerEditDialog
+            streamerId={streamer.id}
+            defaultValues={{
+              displayName: streamer.displayName,
+              platform: streamer.platform,
+              channelUrl: streamer.channelUrl,
+              category: streamer.category,
+              status: streamer.status,
+            }}
+            trigger={<Button variant="outline" size="sm">Edit</Button>}
+          />
+          <ConfirmDeleteButton
+            label="Delete"
+            triggerVariant="outline"
+            triggerSize="sm"
+            confirmDescription={`Delete "${streamer.displayName}"? This removes their profile and login, and unassigns them from every experiment and tracking link.`}
+            redirectTo="/researcher/streamers"
+            onConfirm={() => deleteStreamer(streamer.id)}
+          />
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">

@@ -6,6 +6,76 @@ const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
+  await prisma.siteContent.upsert({
+    where: { id: "singleton" },
+    update: {},
+    create: {
+      id: "singleton",
+      heroHeadline: "UNLOCK\nYOUR\n**VIEWER DROP**\nTODAY!",
+      heroSubtext:
+        "Spin the reward roll for a chance to unlock exclusive viewer bonuses before the event closes. Verified event access. No password required.",
+      claimedCount: "247,000+",
+      countdownSeconds: 23 * 3600 + 48 * 60 + 21,
+      trustBadges: [
+        { icon: "★", title: "100% Official", description: "Verified reward programme" },
+        { icon: "🛡", title: "Secure & Safe", description: "No password needed" },
+        { icon: "🎁", title: "Real Rewards", description: "Credits, vouchers & bonus entries" },
+        { icon: "👥", title: "Trusted by Players", description: "Hundreds of thousands of claims" },
+      ],
+      gameCategories: [
+        {
+          tag: "ACTIVE POOL",
+          title: "Valorant-style Tactical FPS",
+          description: "Fast paced competitive shooter category.",
+        },
+        {
+          tag: "MOBILE POOL",
+          title: "PUBG Mobile Battle Royale",
+          description: "Survival drop category for mobile viewers.",
+        },
+        {
+          tag: "MOBILE POOL",
+          title: "COD Mobile FPS",
+          description: "Action shooter category for livestream viewers.",
+        },
+      ],
+      rewardPool: [
+        { label: "Bonus Credit Token", sub: "Digital", rarity: "rare" },
+        { label: "Bonus Entry", sub: "1 Extra", rarity: "common" },
+        { label: "Viewer Drop", sub: "Selected", rarity: "exceptional" },
+        { label: "Cosmetic Voucher", sub: "Digital", rarity: "common" },
+        { label: "RGT 100 Credit", sub: "Premium", rarity: "exceptional" },
+        { label: "Mystery Booster", sub: "Random", rarity: "rare" },
+        { label: "Shoutout Entry", sub: "Community", rarity: "common" },
+        { label: "Mystery Viewer Drop", sub: "Auto-generated", rarity: "exceptional" },
+      ],
+      gameTypeOptions: ["Valorant-style Tactical FPS", "PUBG Mobile Battle Royale", "COD Mobile FPS", "Other"],
+      watchFrequencyOptions: ["Daily", "A few times a week", "Weekly", "Occasionally", "Rarely"],
+      faqItems: [
+        {
+          q: "Is this really free?",
+          a: "Yes. Every viewer drop entry is part of a community reward event. No payment is requested or needed at any step.",
+        },
+        {
+          q: "Do I need to share my password?",
+          a: "No. LiveDrop Arena never asks for a password, OTP, or account login of any kind.",
+        },
+        {
+          q: "How often can I spin?",
+          a: "One viewer entry can be submitted per event window through the event form.",
+        },
+        {
+          q: "How are rewards delivered?",
+          a: "Reward results are saved with your entry. The team may contact you using your provided email or phone number.",
+        },
+        {
+          q: "What if I do not get the reward I wanted?",
+          a: "Reward results are randomised. Final reward processing may depend on campaign rules and verification.",
+        },
+      ],
+    },
+  });
+
   const researcher = await prisma.user.upsert({
     where: { email: "researcher@example.edu" },
     update: {},

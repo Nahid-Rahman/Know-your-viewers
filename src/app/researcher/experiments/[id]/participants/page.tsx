@@ -9,7 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/common/empty-state";
-import { getExperimentById, getParticipantRows } from "@/lib/mock/research";
+import { getExperimentById, getParticipantRows } from "@/lib/queries/research";
 
 function Tick({ value }: { value: boolean | null }) {
   if (value === null) return <MinusCircle className="size-4 text-muted-foreground/40" />;
@@ -24,10 +24,10 @@ export default async function ParticipantsPage({
   params,
 }: PageProps<"/researcher/experiments/[id]/participants">) {
   const { id } = await params;
-  const experiment = getExperimentById(id);
+  const experiment = await getExperimentById(id);
   if (!experiment) notFound();
 
-  const rows = getParticipantRows(id);
+  const rows = await getParticipantRows(id);
 
   return (
     <div>

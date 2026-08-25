@@ -2,16 +2,30 @@
 
 import { useRef, useState } from "react";
 import { EyebrowLabel } from "@/components/common/eyebrow-label";
-import { RarityBadge } from "@/components/common/rarity-badge";
+import { RarityBadge, type Rarity } from "@/components/common/rarity-badge";
 import { Button } from "@/components/ui/button";
 import { RewardClaimModal } from "@/features/stimulus/components/reward-claim-modal";
-import { rewardPool } from "@/features/stimulus/config";
+import type { StimulusRuntimeConfig } from "@/features/stimulus/config";
+import { logEngagementEvent } from "@/lib/actions/participant";
 import { cn } from "@/lib/utils";
 
-const DEFAULT_INDEX = rewardPool.findIndex((r) => r.label === "Viewer Drop");
+type RewardPoolItem = { label: string; sub: string; rarity: Rarity };
 
-export function RewardRouletteSection() {
-  const [activeIndex, setActiveIndex] = useState(DEFAULT_INDEX);
+export function RewardRouletteSection({
+  config,
+  rewardPool,
+  gameTypeOptions,
+  watchFrequencyOptions,
+}: {
+  config: StimulusRuntimeConfig;
+  rewardPool: RewardPoolItem[];
+  gameTypeOptions: string[];
+  watchFrequencyOptions: string[];
+}) {
+  const [activeIndex, setActiveIndex] = useState(() => {
+    const i = rewardPool.findIndex((r) => r.label === "Viewer Drop");
+    return i === -1 ? 0 : i;
+  });
   const [spinning, setSpinning] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -19,8 +33,14 @@ export function RewardRouletteSection() {
   function handleSpin() {
     if (spinning) return;
     setSpinning(true);
+    void logEngagementEvent("SPIN_CLICKED");
 
-    const targetIndex = Math.floor(Math.random() * rewardPool.length);
+    // The reveal is rigged, not random: it lands on a reward matching the
+    // participant's assigned Condition.rewardRarity when one is available.
+    const candidates = rewardPool.filter((r) => r.rarity === config.rewardRarity);
+    const pool = candidates.length ? candidates : rewardPool;
+    const target = pool[Math.floor(Math.random() * pool.length)];
+    const targetIndex = rewardPool.indexOf(target);
     let ticks = 0;
     const totalTicks = 18;
     const tick = () => {
@@ -30,7 +50,10 @@ export function RewardRouletteSection() {
         if (timerRef.current) clearTimeout(timerRef.current);
         setActiveIndex(targetIndex);
         setSpinning(false);
-        setTimeout(() => setModalOpen(true), 350);
+        setTimeout(() => {
+          setModalOpen(true);
+          void logEngagementEvent("MODAL_OPENED");
+        }, 350);
         return;
       }
     };
@@ -102,7 +125,14 @@ export function RewardRouletteSection() {
         </p>
       </div>
 
-      <RewardClaimModal open={modalOpen} onOpenChange={setModalOpen} reward={selected} />
+      <RewardClaimModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        reward={selected}
+        contactRequirement={config.contactRequirement}
+        gameTypeOptions={gameTypeOptions}
+        watchFrequencyOptions={watchFrequencyOptions}
+      />
     </section>
   );
 }

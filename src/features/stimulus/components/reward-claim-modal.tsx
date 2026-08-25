@@ -14,39 +14,50 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { RarityBadge, type Rarity } from "@/components/common/rarity-badge";
+import { toast } from "sonner";
 import { LightInput, LightSelect, LightFieldLabel } from "@/components/common/light-field";
-import { saveMockEntry, generateResponseCode } from "@/features/stimulus/mock-entry-store";
-import { gameTypeOptions, watchFrequencyOptions } from "@/features/stimulus/config";
+import { saveMockEntry } from "@/features/stimulus/mock-entry-store";
+import { logEngagementEvent, submitEntry } from "@/lib/actions/participant";
+import type { ContactRequirement } from "@/generated/prisma/enums";
 
-const entrySchema = z
-  .object({
+function buildEntrySchema(contactRequired: boolean) {
+  const base = z.object({
     email: z.string().optional(),
     phone: z.string().optional(),
     streamNickname: z.string().optional(),
     favouriteGameType: z.string().optional(),
     livestreamFrequency: z.string().optional(),
-  })
-  .refine((v) => Boolean(v.email?.trim() || v.phone?.trim()), {
+  });
+  if (!contactRequired) return base;
+  return base.refine((v) => Boolean(v.email?.trim() || v.phone?.trim()), {
     message: "Enter an email or phone number so the team can reach you.",
     path: ["email"],
   });
+}
 
-type EntryValues = z.infer<typeof entrySchema>;
+type EntryValues = z.infer<ReturnType<typeof buildEntrySchema>>;
 
 export function RewardClaimModal({
   open,
   onOpenChange,
   reward,
+  contactRequirement,
+  gameTypeOptions,
+  watchFrequencyOptions,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   reward: { label: string; rarity: Rarity };
+  contactRequirement: ContactRequirement;
+  gameTypeOptions: string[];
+  watchFrequencyOptions: string[];
 }) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const contactRequired = contactRequirement === "REQUIRED";
 
   const form = useForm<EntryValues>({
-    resolver: zodResolver(entrySchema),
+    resolver: zodResolver(buildEntrySchema(contactRequired)),
     defaultValues: {
       email: "",
       phone: "",
@@ -56,11 +67,27 @@ export function RewardClaimModal({
     },
   });
 
+  function handleOpenChange(next: boolean) {
+    if (!next && !submitting) void logEngagementEvent("ABANDONED");
+    onOpenChange(next);
+  }
+
   async function onSubmit(values: EntryValues) {
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 900));
+    const result = await submitEntry({
+      ...values,
+      rewardLabel: reward.label,
+      rewardRarity: reward.rarity,
+    });
+    setSubmitting(false);
+
+    if ("error" in result) {
+      toast.error(result.error);
+      return;
+    }
+
     saveMockEntry({
-      responseCode: generateResponseCode(),
+      responseCode: result.responseCode,
       rewardLabel: reward.label,
       rewardRarity: reward.rarity,
       email: values.email?.trim() ?? "",
@@ -70,7 +97,6 @@ export function RewardClaimModal({
       livestreamFrequency: values.livestreamFrequency ?? "",
       submittedAt: new Date().toISOString(),
     });
-    setSubmitting(false);
     onOpenChange(false);
     form.reset();
     // The reference stays on the page and updates a hero card in place; we
@@ -80,7 +106,7 @@ export function RewardClaimModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-lg sm:max-w-lg">
         <DialogHeader>
           <p className="text-xs font-semibold text-muted-foreground uppercase">
@@ -116,25 +142,33 @@ export function RewardClaimModal({
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div>
             <p className="text-sm font-bold">Complete your entry</p>
-            <p className="text-xs text-muted-foreground">One contact method is required for follow-up.</p>
+            <p className="text-xs text-muted-foreground">
+              {contactRequired
+                ? "One contact method is required for follow-up."
+                : "Contact info is optional — leave blank to skip."}
+            </p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <LightFieldLabel htmlFor="entry-email">Email (optional)</LightFieldLabel>
+              <LightFieldLabel htmlFor="entry-email">Email {contactRequired ? "" : "(optional)"}</LightFieldLabel>
               <LightInput
                 id="entry-email"
                 type="email"
                 placeholder="viewer017@example.com"
+                onFocus={() => void logEngagementEvent("FIELD_FOCUSED")}
                 {...form.register("email")}
               />
             </div>
             <div>
-              <LightFieldLabel htmlFor="entry-phone">Phone Number (optional)</LightFieldLabel>
+              <LightFieldLabel htmlFor="entry-phone">
+                Phone Number {contactRequired ? "" : "(optional)"}
+              </LightFieldLabel>
               <LightInput
                 id="entry-phone"
                 type="tel"
                 placeholder="01XXXXXXXXX"
+                onFocus={() => void logEngagementEvent("FIELD_FOCUSED")}
                 {...form.register("phone")}
               />
             </div>
@@ -196,7 +230,7 @@ export function RewardClaimModal({
             type="button"
             variant="outline"
             className="h-11 w-full"
-            onClick={() => onOpenChange(false)}
+            onClick={() => handleOpenChange(false)}
           >
             Cancel
           </Button>

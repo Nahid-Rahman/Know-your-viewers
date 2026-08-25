@@ -3,15 +3,20 @@ import { Link2, ListVideo, MousePointerClick } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatCard } from "@/components/common/stat-card";
 import { CopyableCode } from "@/components/common/copyable-code";
-import { mockExperiments, mockTrackingLinks } from "@/lib/mock/research";
-
-const CURRENT_STREAMER_ID = "str_1";
+import { requireRoleOrRedirect } from "@/lib/auth";
+import { getExperiments, getStreamerByUserId, getTrackingLinks } from "@/lib/queries/research";
 
 export const metadata = { title: "Streamer Dashboard | LiveDrop Arena" };
 
-export default function StreamerDashboardPage() {
-  const assigned = mockExperiments.filter((e) => e.assignedStreamerIds.includes(CURRENT_STREAMER_ID));
-  const myLinks = mockTrackingLinks.filter((l) => l.streamerId === CURRENT_STREAMER_ID);
+export default async function StreamerDashboardPage() {
+  const user = await requireRoleOrRedirect("STREAMER");
+  const streamer = await getStreamerByUserId(user.id);
+  const streamerId = streamer?.id ?? "";
+
+  const allExperiments = await getExperiments();
+  const assigned = allExperiments.filter((e) => e.assignedStreamerIds.includes(streamerId));
+  const linksByExperiment = await Promise.all(assigned.map((e) => getTrackingLinks(e.id)));
+  const myLinks = linksByExperiment.flat().filter((l) => l.streamerId === streamerId);
   const totalClicks = myLinks.reduce((s, l) => s + l.visits, 0);
 
   return (
