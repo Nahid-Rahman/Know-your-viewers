@@ -1,0 +1,336 @@
+// LiveDrop Arena — research data model.
+// Connection URLs live in prisma.config.ts (Migrate/Studio) and in the
+// PrismaClient driver adapter (runtime) — see src/lib/prisma.ts. Prisma 7
+// no longer supports `url` / `directUrl` in the datasource block.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+
+enum Role {
+  RESEARCHER
+  STREAMER
+  PARTICIPANT
+}
+
+model User {
+  id         String   @id @default(uuid())
+  supabaseId String   @unique
+  name       String
+  email      String   @unique
+  role       Role
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  experiments Experiment[] @relation("ExperimentResearcher")
+  streamer    Streamer?
+
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// Experiments
+// ---------------------------------------------------------------------------
+
+enum ExperimentStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+model Experiment {
+  id                String           @id @default(uuid())
+  title             String
+  description       String
+  objective         String
+  status            ExperimentStatus @default(DRAFT)
+  startDate         DateTime
+  endDate           DateTime?
+  // Required before status may transition to ACTIVE — enforced in the
+  // experiment status-change server action, not just at the schema level.
+  ethicsApprovalRef String?
+
+  researcherId String
+  researcher   User   @relation("ExperimentResearcher", fields: [researcherId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  streamers      ExperimentStreamer[]
+  conditions     Condition[]
+  participants   Participant[]
+  surveys        Survey[]
+  trackingLinks  TrackingLink[]
+
+  @@index([researcherId])
+  @@map("experiments")
+}
+
+// Join table: which streamers are assigned to recruit for which experiment.
+model ExperimentStreamer {
+  id           String   @id @default(uuid())
+  experimentId String
+  streamerId   String
+  assignedAt   DateTime @default(now())
+
+  experiment Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  streamer   Streamer   @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+
+  @@unique([experimentId, streamerId])
+  @@map("experiment_streamers")
+}
+
+// A randomly-assigned variant of the stimulus. This is what turns the
+// platform into a factorial experiment rather than a single fixed page —
+// each toggle corresponds 1:1 to a persuasion element in the stimulus UI.
+model Condition {
+  id                     String  @id @default(uuid())
+  experimentId           String
+  name                   String
+  urgencyEnabled         Boolean @default(false)
+  socialProofEnabled     Boolean @default(false)
+  authorityBadgesEnabled Boolean @default(false)
+  rewardRarity           Rarity  @default(COMMON)
+  contactRequirement     ContactRequirement @default(OPTIONAL)
+
+  experiment   Experiment    @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  participants Participant[]
+
+  createdAt DateTime @default(now())
+
+  @@index([experimentId])
+  @@map("conditions")
+}
+
+enum Rarity {
+  COMMON
+  RARE
+  EXCEPTIONAL
+  PREMIUM
+}
+
+enum ContactRequirement {
+  OPTIONAL
+  REQUIRED
+}
+
+// ---------------------------------------------------------------------------
+// Streamers
+// ---------------------------------------------------------------------------
+
+enum StreamerStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+}
+
+model Streamer {
+  id          String         @id @default(uuid())
+  userId      String         @unique
+  displayName String
+  platform    String
+  channelUrl  String
+  category    String
+  status      StreamerStatus @default(PENDING)
+  createdAt   DateTime       @default(now())
+
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  experiments   ExperimentStreamer[]
+  trackingLinks TrackingLink[]
+
+  @@map("streamers")
+}
+
+// ---------------------------------------------------------------------------
+// Participants — anonymous by design. No account, no session-based identity.
+// ---------------------------------------------------------------------------
+
+enum ConsentStatus {
+  PENDING
+  GRANTED
+  DECLINED
+}
+
+model Participant {
+  id             String        @id @default(uuid())
+  experimentId   String
+  conditionId    String?
+  // Which streamer's link brought this participant in — visit/conversion
+  // counts for a TrackingLink are derived from this relation rather than
+  // kept in a separate counter table.
+  trackingLinkId String?
+  anonymousCode  String        @unique
+  consentStatus  ConsentStatus @default(PENDING)
+  createdAt      DateTime      @default(now())
+
+  experiment   Experiment    @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  condition    Condition?    @relation(fields: [conditionId], references: [id])
+  trackingLink TrackingLink? @relation(fields: [trackingLinkId], references: [id])
+
+  // Contact details live in a separate, independently-deletable table —
+  // never joined into analytics queries.
+  contact  ParticipantContact?
+  consent  Consent?
+  debrief  Debrief?
+  responses Response[]
+  events   EngagementEvent[]
+
+  @@index([experimentId])
+  @@index([conditionId])
+  @@index([trackingLinkId])
+  @@map("participants")
+}
+
+// Deliberately split from Participant so a debrief decline (see Debrief
+// below) can delete this row alone, without touching behavioural data used
+// in aggregate analysis.
+model ParticipantContact {
+  id              String   @id @default(uuid())
+  participantId   String   @unique
+  // Encrypted at rest with AES-256-GCM (see src/lib/crypto.ts). Never
+  // decrypted for display in the researcher dashboard — only for an
+  // outbound contact action a human researcher explicitly triggers.
+  encryptedValue  String
+  streamNickname  String?
+  favouriteGameType String?
+  livestreamFrequency String?
+  createdAt       DateTime @default(now())
+
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@map("participant_contacts")
+}
+
+model Consent {
+  id             String        @id @default(uuid())
+  participantId  String        @unique
+  consentGiven   Boolean
+  consentVersion String
+  timestamp      DateTime      @default(now())
+
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@map("consents")
+}
+
+// The retroactive-consent mechanism required because the stimulus uses
+// deception. `permissionGiven = false` triggers deletion of
+// ParticipantContact and exclusion of this participant from analysis.
+model Debrief {
+  id               String   @id @default(uuid())
+  participantId    String   @unique
+  explanationShown Boolean  @default(true)
+  permissionGiven  Boolean?
+  timestamp        DateTime @default(now())
+
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@map("debriefs")
+}
+
+// ---------------------------------------------------------------------------
+// Surveys
+// ---------------------------------------------------------------------------
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  LIKERT
+  RATING
+  TEXT
+}
+
+model Survey {
+  id           String  @id @default(uuid())
+  experimentId String
+  title        String
+  description  String?
+
+  experiment Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  questions  Question[]
+  responses  Response[]
+
+  @@index([experimentId])
+  @@map("surveys")
+}
+
+model Question {
+  id           String       @id @default(uuid())
+  surveyId     String
+  questionText String
+  questionType QuestionType
+  // For MULTIPLE_CHOICE / LIKERT: string[] of option labels. Null otherwise.
+  options      Json?
+  order        Int
+
+  survey Survey @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  @@index([surveyId])
+  @@map("questions")
+}
+
+model Response {
+  id            String   @id @default(uuid())
+  surveyId      String
+  participantId String
+  // { [questionId]: string | number }
+  answers       Json
+  submittedAt   DateTime @default(now())
+
+  survey      Survey      @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([surveyId, participantId])
+  @@map("responses")
+}
+
+// ---------------------------------------------------------------------------
+// Tracking / research links and anonymous engagement events
+// ---------------------------------------------------------------------------
+
+model TrackingLink {
+  id           String   @id @default(uuid())
+  experimentId String
+  streamerId   String?
+  uniqueCode   String   @unique
+  createdAt    DateTime @default(now())
+
+  experiment   Experiment    @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  streamer     Streamer?     @relation(fields: [streamerId], references: [id])
+  participants Participant[]
+
+  @@index([experimentId])
+  @@map("tracking_links")
+}
+
+enum EngagementEventType {
+  PAGE_VIEW
+  SPIN_CLICKED
+  MODAL_OPENED
+  FIELD_FOCUSED
+  SUBMITTED
+  ABANDONED
+}
+
+// Minimal, anonymous funnel telemetry keyed only to a participant's
+// anonymous code — never an IP address, user agent, or referrer.
+model EngagementEvent {
+  id            String              @id @default(uuid())
+  participantId String
+  type          EngagementEventType
+  timestamp     DateTime            @default(now())
+
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@index([participantId])
+  @@map("engagement_events")
+}
