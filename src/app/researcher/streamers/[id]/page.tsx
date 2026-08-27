@@ -51,7 +51,7 @@ export default async function StreamerDetailPage({
             triggerSize="sm"
             confirmDescription={`Delete "${streamer.displayName}"? This removes their profile and login, and unassigns them from every experiment and tracking link.`}
             redirectTo="/researcher/streamers"
-            onConfirm={() => deleteStreamer(streamer.id)}
+            onConfirm={deleteStreamer.bind(null, streamer.id)}
           />
         </div>
       </div>

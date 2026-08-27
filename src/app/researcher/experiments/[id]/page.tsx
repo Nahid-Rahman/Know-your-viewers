@@ -72,7 +72,7 @@ export default async function ExperimentOverviewPage({
               confirmDescription={`This permanently deletes "${experiment.title}" and all of its participants, responses, and engagement events.`}
               requireTypedConfirmation={experiment.title}
               redirectTo="/researcher/experiments"
-              onConfirm={() => deleteExperiment(experiment.id)}
+              onConfirm={deleteExperiment.bind(null, experiment.id)}
             />
           </div>
         </div>

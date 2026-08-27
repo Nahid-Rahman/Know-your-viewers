@@ -70,7 +70,7 @@ export default async function StreamersPage() {
                     />
                     <ConfirmDeleteButton
                       confirmDescription={`Delete "${s.displayName}"? This removes their profile and login, and unassigns them from every experiment and tracking link.`}
-                      onConfirm={() => deleteStreamer(s.id)}
+                      onConfirm={deleteStreamer.bind(null, s.id)}
                     />
                   </div>
                 </TableCell>
