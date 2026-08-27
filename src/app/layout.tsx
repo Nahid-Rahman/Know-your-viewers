@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Space_Grotesk, Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { getSiteContent } from "@/lib/queries/research";
+import { DEFAULT_SITE_CONTENT } from "@/lib/site-content-defaults";
 import "./globals.css";
 
 const fontDisplay = Space_Grotesk({
@@ -21,15 +23,17 @@ const fontBody = Inter({
 const monoStack =
   "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace";
 
-export const metadata: Metadata = {
-  title: "LiveDrop Arena",
-  description:
-    "Academic research prototype studying livestream gaming recruitment and disclosure behaviour.",
-  robots: {
-    index: false,
-    follow: false,
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const content = (await getSiteContent()) ?? DEFAULT_SITE_CONTENT;
+  return {
+    title: content.siteName,
+    description: content.siteDescription,
+    robots: {
+      index: false,
+      follow: false,
+    },
+  };
+}
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

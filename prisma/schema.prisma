@@ -347,6 +347,8 @@ model EngagementEvent {
 
 model SiteContent {
   id                    String   @id @default("singleton")
+  siteName              String   @default("LiveDrop Arena")
+  siteDescription       String   @default("Academic research prototype studying livestream gaming recruitment and disclosure behaviour.")
   heroHeadline          String
   heroSubtext           String
   claimedCount          String
@@ -357,6 +359,13 @@ model SiteContent {
   gameTypeOptions       Json // string[]
   watchFrequencyOptions Json // string[]
   faqItems              Json // { q, a }[]
+  navContent            Json     @default("{}") // { links: { href, label }[], ctaLabel }
+  footerContent         Json     @default("{}") // { links: { href, label }[], copyrightText, disclaimerText }
+  aboutContent          Json     @default("{}")
+  supportContent        Json     @default("{}")
+  termsContent          Json     @default("{}")
+  debriefContent        Json     @default("{}")
+  entryReceivedContent  Json     @default("{}")
   updatedAt             DateTime @updatedAt
 
   @@map("site_content")

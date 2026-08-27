@@ -1,44 +1,32 @@
 import { EyebrowLabel } from "@/components/common/eyebrow-label";
+import { RichHeadline } from "@/components/common/rich-headline";
 import { SupportForm } from "@/features/stimulus/components/support-form";
+import { getSiteContent } from "@/lib/queries/research";
+import { DEFAULT_SITE_CONTENT } from "@/lib/site-content-defaults";
 
-export const metadata = { title: "Contact Support | LiveDrop Arena" };
+export async function generateMetadata() {
+  const content = await getSiteContent();
+  const support = content?.supportContent ?? DEFAULT_SITE_CONTENT.supportContent;
+  const siteName = content?.siteName ?? DEFAULT_SITE_CONTENT.siteName;
+  return { title: `${support.pageTitle} | ${siteName}` };
+}
 
-const INFO_CARDS = [
-  {
-    icon: "📄",
-    title: "Entry Follow-up",
-    description: "Use your response code if you need help checking the status of your viewer drop entry.",
-  },
-  {
-    icon: "✓",
-    title: "Reward Verification",
-    description: "Reward results are saved with the entry and reviewed before the team contacts the participant.",
-  },
-  {
-    icon: "🛡",
-    title: "Safe Support",
-    description: "Support will never ask for your password, OTP, payment details, or game account login.",
-  },
-];
+export default async function SupportPage() {
+  const content = (await getSiteContent()) ?? DEFAULT_SITE_CONTENT;
+  const support = content.supportContent;
 
-export default function SupportPage() {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6">
       <div className="grid gap-12 md:grid-cols-2 md:items-start">
         <div>
-          <EyebrowLabel className="mb-4">CONTACT SUPPORT</EyebrowLabel>
+          <EyebrowLabel className="mb-4">{support.heroEyebrow}</EyebrowLabel>
           <h1 className="font-display text-4xl font-bold sm:text-5xl">
-            Need help with
-            <br />
-            <span className="text-gradient-primary">your viewer drop?</span>
+            <RichHeadline text={support.heroTitle} />
           </h1>
-          <p className="mt-4 max-w-md text-sm text-muted-foreground">
-            Send a short support request about your viewer drop entry. Our team will contact you
-            regarding the next process after verification.
-          </p>
+          <p className="mt-4 max-w-md text-sm text-muted-foreground">{support.heroSubtext}</p>
 
           <div className="mt-8 space-y-4">
-            {INFO_CARDS.map((card) => (
+            {support.infoCards.map((card) => (
               <div key={card.title} className="card-border flex items-start gap-3 rounded-xl p-4">
                 <span className="text-xl">{card.icon}</span>
                 <div>
@@ -55,19 +43,15 @@ export default function SupportPage() {
             <span className="text-2xl">✉</span>
             <div>
               <p className="font-display text-lg font-bold">Support Request</p>
-              <p className="text-xs font-semibold text-primary">LIVEDROP ARENA</p>
+              <p className="text-xs font-semibold text-primary">{content.siteName.toUpperCase()}</p>
             </div>
           </div>
           <SupportForm />
-          <p className="mt-4 text-center text-xs text-muted-foreground">
-            Our team will contact you using the provided email or phone number.
-          </p>
+          <p className="mt-4 text-center text-xs text-muted-foreground">{support.formFooterText}</p>
         </div>
       </div>
 
-      <p className="mt-16 text-center text-xs font-semibold text-green">
-        ✓ No password &nbsp; ✓ No OTP &nbsp; ✓ No payment &nbsp; ✓ No game login &nbsp; ✓ No account connection
-      </p>
+      <p className="mt-16 text-center text-xs font-semibold text-green">{support.bottomTrustText}</p>
     </div>
   );
 }

@@ -5,14 +5,14 @@ import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Controller } from "react-hook-form";
-import { updateSiteContent, type SiteContentValues } from "@/lib/actions/site-content";
+import { updateSiteContent, type LandingContentValues } from "@/lib/actions/site-content";
+import { ContentSection as Section, RemoveRowButton } from "@/features/researcher/content-form-shared";
 
 const schema = z.object({
   heroHeadline: z.string().min(1, "Required."),
@@ -35,30 +35,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-function Section({ title, children, onAdd }: { title: string; children: React.ReactNode; onAdd: () => void }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-6">
-      <div className="mb-4 flex items-center justify-between">
-        <p className="font-semibold">{title}</p>
-        <Button type="button" variant="outline" size="sm" onClick={onAdd}>
-          <Plus data-icon="inline-start" className="size-3.5" />
-          Add
-        </Button>
-      </div>
-      <div className="space-y-3">{children}</div>
-    </div>
-  );
-}
-
-function RemoveRowButton({ onClick }: { onClick: () => void }) {
-  return (
-    <Button type="button" variant="ghost" size="icon" onClick={onClick} aria-label="Remove">
-      <Trash2 className="size-4 text-destructive" />
-    </Button>
-  );
-}
-
-export function SiteContentForm({ content }: { content: SiteContentValues }) {
+export function SiteContentForm({ content }: { content: LandingContentValues }) {
   const [submitting, setSubmitting] = useState(false);
 
   const form = useForm<FormValues>({

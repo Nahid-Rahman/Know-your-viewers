@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
@@ -18,6 +18,8 @@ import { TrustStrip } from "@/components/common/trust-strip";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { loadMockEntry, type MockEntry } from "@/features/stimulus/mock-entry-store";
+import { getPublicSiteContent } from "@/lib/actions/site-content";
+import { DEFAULT_SITE_CONTENT, type EntryReceivedContent } from "@/lib/site-content-defaults";
 
 const DETAIL_ICONS = {
   contact: Mail,
@@ -38,12 +40,19 @@ export default function SubmissionReceivedPage() {
     loadMockEntry,
     () => undefined,
   );
+  const [content, setContent] = useState<EntryReceivedContent>(DEFAULT_SITE_CONTENT.entryReceivedContent);
 
   useEffect(() => {
     if (entry === null) {
       router.replace("/");
     }
   }, [entry, router]);
+
+  useEffect(() => {
+    void getPublicSiteContent().then((c) => {
+      if (c) setContent(c.entryReceivedContent);
+    });
+  }, []);
 
   if (entry === undefined || entry === null) {
     return (
@@ -68,22 +77,19 @@ export default function SubmissionReceivedPage() {
             <CheckCircle2 className="size-7 text-accent-green" />
           </div>
           <span className="mb-4 rounded-full border border-accent-green/30 bg-accent-green/10 px-3 py-1 text-[11px] font-semibold tracking-[0.1em] text-accent-green uppercase">
-            Entry Confirmed
+            {content.badgeText}
           </span>
-          <h1 className="font-display text-3xl font-bold sm:text-4xl">Submission Received</h1>
-          <p className="mt-3 max-w-sm text-sm text-muted-foreground">
-            Your viewer drop entry has been recorded successfully. Our team will contact you
-            regarding the next process after verification.
-          </p>
+          <h1 className="font-display text-3xl font-bold sm:text-4xl">{content.title}</h1>
+          <p className="mt-3 max-w-sm text-sm text-muted-foreground">{content.subtext}</p>
         </div>
 
         <div className="mt-8 flex items-center justify-between rounded-xl border border-primary/25 bg-primary/5 p-4">
           <div>
             <p className="text-[11px] font-semibold tracking-[0.1em] text-muted-foreground uppercase">
-              Your Viewer Drop Result
+              {content.resultLabel}
             </p>
             <p className="mt-1 font-bold">{entry.rewardLabel}</p>
-            <p className="text-xs text-muted-foreground">Result saved for follow-up verification.</p>
+            <p className="text-xs text-muted-foreground">{content.resultCaption}</p>
           </div>
           <RarityBadge rarity={entry.rewardRarity} />
         </div>
@@ -97,7 +103,7 @@ export default function SubmissionReceivedPage() {
 
         <div className="mt-4 rounded-xl border border-border">
           <p className="border-b border-border px-4 py-3 text-[11px] font-semibold tracking-[0.1em] text-muted-foreground uppercase">
-            Submitted Details
+            {content.submittedDetailsLabel}
           </p>
           <div className="divide-y divide-border">
             {details.map(({ key, label, value }) => {
@@ -129,11 +135,7 @@ export default function SubmissionReceivedPage() {
           </Link>
         </div>
 
-        <TrustStrip
-          tone="safe"
-          className="mt-6"
-          items={["No password", "No OTP", "No payment", "No game login", "No account connection"]}
-        />
+        <TrustStrip tone="safe" className="mt-6" items={content.trustItems} />
       </div>
     </div>
   );

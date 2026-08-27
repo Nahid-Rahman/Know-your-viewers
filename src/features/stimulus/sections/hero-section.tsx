@@ -1,34 +1,12 @@
-import { Fragment } from "react";
 import Link from "next/link";
 import { EyebrowLabel } from "@/components/common/eyebrow-label";
+import { RichHeadline } from "@/components/common/rich-headline";
 import { CountdownChip } from "@/components/common/countdown-chip";
 import { RewardOrb } from "@/components/common/reward-orb";
 import { HeroContactCard } from "@/features/stimulus/components/hero-contact-card";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { StimulusRuntimeConfig } from "@/features/stimulus/config";
-
-/** Renders editable headline copy: "\n" breaks lines, **text** gets the gradient highlight. */
-function HeroHeadline({ text }: { text: string }) {
-  return (
-    <>
-      {text.split("\n").map((line, i) => (
-        <Fragment key={i}>
-          {i > 0 && <br />}
-          {line.split(/(\*\*[^*]+\*\*)/g).map((part, j) =>
-            part.startsWith("**") && part.endsWith("**") ? (
-              <span key={j} className="text-gradient-primary">
-                {part.slice(2, -2)}
-              </span>
-            ) : (
-              <Fragment key={j}>{part}</Fragment>
-            ),
-          )}
-        </Fragment>
-      ))}
-    </>
-  );
-}
 
 export function HeroSection({
   config,
@@ -46,7 +24,7 @@ export function HeroSection({
           )}
 
           <h1 className="font-display text-5xl leading-[1.05] font-bold sm:text-6xl">
-            <HeroHeadline text={content.heroHeadline} />
+            <RichHeadline text={content.heroHeadline} />
           </h1>
 
           <p className="mt-5 max-w-md text-muted-foreground">{content.heroSubtext}</p>

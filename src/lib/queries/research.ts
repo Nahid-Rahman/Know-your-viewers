@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import type {
   Experiment as ExperimentDTO,
@@ -12,7 +13,7 @@ import type {
   ConditionModel as Condition,
   StreamerModel as Streamer,
 } from "@/generated/prisma/models";
-import type { SiteContentValues } from "@/lib/actions/site-content";
+import { DEFAULT_SITE_CONTENT, type SiteContentValues } from "@/lib/site-content-defaults";
 
 function pct(n: number, total: number) {
   return total > 0 ? Math.round((n / total) * 100) : 0;
@@ -170,11 +171,13 @@ export async function getFunnel(experimentId: string): Promise<FunnelStage[]> {
   ];
 }
 
-export async function getSiteContent(): Promise<SiteContentValues | null> {
+export const getSiteContent = cache(async (): Promise<SiteContentValues | null> => {
   const row = await prisma.siteContent.findUnique({ where: { id: "singleton" } });
   if (!row) return null;
 
   return {
+    siteName: row.siteName,
+    siteDescription: row.siteDescription,
     heroHeadline: row.heroHeadline,
     heroSubtext: row.heroSubtext,
     claimedCount: row.claimedCount,
@@ -185,8 +188,18 @@ export async function getSiteContent(): Promise<SiteContentValues | null> {
     gameTypeOptions: row.gameTypeOptions as SiteContentValues["gameTypeOptions"],
     watchFrequencyOptions: row.watchFrequencyOptions as SiteContentValues["watchFrequencyOptions"],
     faqItems: row.faqItems as SiteContentValues["faqItems"],
+    navContent: { ...DEFAULT_SITE_CONTENT.navContent, ...(row.navContent as object) },
+    footerContent: { ...DEFAULT_SITE_CONTENT.footerContent, ...(row.footerContent as object) },
+    aboutContent: { ...DEFAULT_SITE_CONTENT.aboutContent, ...(row.aboutContent as object) },
+    supportContent: { ...DEFAULT_SITE_CONTENT.supportContent, ...(row.supportContent as object) },
+    termsContent: { ...DEFAULT_SITE_CONTENT.termsContent, ...(row.termsContent as object) },
+    debriefContent: { ...DEFAULT_SITE_CONTENT.debriefContent, ...(row.debriefContent as object) },
+    entryReceivedContent: {
+      ...DEFAULT_SITE_CONTENT.entryReceivedContent,
+      ...(row.entryReceivedContent as object),
+    },
   };
-}
+});
 
 export async function getSurveysForExperiment(experimentId: string) {
   return prisma.survey.findMany({

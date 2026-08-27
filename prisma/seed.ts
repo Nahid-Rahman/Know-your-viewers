@@ -1,6 +1,7 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { encryptContact } from "../src/lib/crypto";
+import { DEFAULT_SITE_CONTENT } from "../src/lib/site-content-defaults";
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
@@ -11,6 +12,15 @@ async function main() {
     update: {},
     create: {
       id: "singleton",
+      siteName: DEFAULT_SITE_CONTENT.siteName,
+      siteDescription: DEFAULT_SITE_CONTENT.siteDescription,
+      navContent: DEFAULT_SITE_CONTENT.navContent,
+      footerContent: DEFAULT_SITE_CONTENT.footerContent,
+      aboutContent: DEFAULT_SITE_CONTENT.aboutContent,
+      supportContent: DEFAULT_SITE_CONTENT.supportContent,
+      termsContent: DEFAULT_SITE_CONTENT.termsContent,
+      debriefContent: DEFAULT_SITE_CONTENT.debriefContent,
+      entryReceivedContent: DEFAULT_SITE_CONTENT.entryReceivedContent,
       heroHeadline: "UNLOCK\nYOUR\n**VIEWER DROP**\nTODAY!",
       heroSubtext:
         "Spin the reward roll for a chance to unlock exclusive viewer bonuses before the event closes. Verified event access. No password required.",
