@@ -35,7 +35,7 @@ async function main() {
       gameCategories: [
         {
           icon: "🎯",
-          image: "/images/categories/valorant-tactical-v2.jpg",
+          image: "/images/categories/valorant-gameplay.png",
           tag: "ACTIVE POOL",
           title: "Valorant-style Tactical FPS",
           description: "Fast paced competitive shooter category.",
@@ -77,7 +77,7 @@ async function main() {
         },
         {
           icon: "⛏️",
-          image: "/images/categories/minecraft-blocks.jpg",
+          image: "/images/categories/minecraft-gameplay.png",
           tag: "PC POOL",
           title: "Minecraft Multiplayer",
           description: "Sandbox survival and building category for PC streams.",
