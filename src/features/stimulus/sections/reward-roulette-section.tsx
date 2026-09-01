@@ -11,6 +11,20 @@ import { cn } from "@/lib/utils";
 
 type RewardPoolItem = { label: string; sub: string; rarity: Rarity };
 
+const RARITY_ACCENT: Record<Rarity, string> = {
+  common: "var(--blue)",
+  rare: "var(--purple)",
+  exceptional: "var(--primary)",
+  premium: "var(--green)",
+};
+
+const RARITY_EMOJI: Record<Rarity, string> = {
+  common: "⭐",
+  rare: "💠",
+  exceptional: "🔥",
+  premium: "💎",
+};
+
 export function RewardRouletteSection({
   config,
   rewardPool,
@@ -77,7 +91,7 @@ export function RewardRouletteSection({
       className="scroll-mt-[69px] border-y border-border bg-background-deep/40 py-16"
     >
       <div className="mx-auto w-full max-w-6xl px-4 text-center sm:px-6">
-        <EyebrowLabel variant="primary" glyph={null} className="mb-4">
+        <EyebrowLabel variant="primary" glyph="🎰" className="mb-4">
           ROULETTE
         </EyebrowLabel>
         <h2 className="font-display text-3xl font-bold sm:text-4xl">
@@ -90,30 +104,55 @@ export function RewardRouletteSection({
         </p>
 
         <div className="scrollbar-none mt-10 flex items-center justify-center gap-3 overflow-x-auto pb-2">
-          {rewardPool.map((reward, i) => (
-            <div
-              key={reward.label}
-              className={cn(
-                "card-border w-32 shrink-0 rounded-xl p-4 text-left transition-all",
-                i === activeIndex
-                  ? "border-primary! shadow-[0_0_30px_-8px_var(--primary)] scale-105"
-                  : "opacity-70",
-              )}
-            >
-              <RarityBadge rarity={reward.rarity} />
-              <p className="mt-2 text-xs font-semibold">{reward.label}</p>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">{reward.sub}</p>
-            </div>
-          ))}
+          {rewardPool.map((reward, i) => {
+            const accent = RARITY_ACCENT[reward.rarity];
+            const isActive = i === activeIndex;
+            return (
+              <div
+                key={reward.label}
+                className={cn(
+                  "relative w-36 shrink-0 rounded-2xl border p-4 text-left transition-all duration-300",
+                  isActive
+                    ? cn(
+                        "scale-110 border-2",
+                        spinning ? "animate-tick-flash" : "animate-tile-land",
+                      )
+                    : "scale-95 border-border-strong/50 opacity-60",
+                )}
+                style={
+                  isActive
+                    ? {
+                        borderColor: accent,
+                        boxShadow: `0 0 32px -6px ${accent}`,
+                        background: `linear-gradient(160deg, color-mix(in oklch, ${accent}, transparent 85%), var(--card))`,
+                      }
+                    : undefined
+                }
+              >
+                <span className="text-lg" aria-hidden>
+                  {RARITY_EMOJI[reward.rarity]}
+                </span>
+                <RarityBadge rarity={reward.rarity} className="mt-1 block" />
+                <p className="mt-2 text-sm font-bold font-display">{reward.label}</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">{reward.sub}</p>
+              </div>
+            );
+          })}
         </div>
 
         <Button
           size="lg"
           onClick={handleSpin}
           disabled={spinning}
-          className="mt-8 h-11 w-full max-w-xs bg-gradient-primary text-sm font-bold tracking-wide text-white hover:opacity-90 sm:w-auto sm:px-10"
+          className={cn(
+            "mt-10 h-16 w-full max-w-xs rounded-full bg-gradient-primary text-base font-black tracking-wide text-white uppercase shadow-[0_0_44px_-10px_var(--primary)] transition-transform hover:opacity-90 active:scale-95 disabled:opacity-90 sm:w-auto sm:px-16",
+            !spinning && "animate-pulse-glow",
+          )}
         >
-          {spinning ? "SPINNING..." : "SPIN"}
+          <span aria-hidden className={cn("mr-2 inline-block", spinning && "animate-spin-slow")}>
+            🎰
+          </span>
+          {spinning ? "Spinning..." : "Spin to Win"}
         </Button>
 
         <p className="mt-4 text-xs text-muted-foreground">
