@@ -257,4 +257,62 @@
     background-color: var(--card);
     border: 1px solid var(--border);
   }
+
+  /* Hero reward orb: rotating ring, breathing glow, floating badges, sparkles. */
+  @keyframes spin-slow {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes pulse-glow {
+    0%,
+    100% {
+      box-shadow: 0 0 40px -8px color-mix(in oklch, var(--primary), transparent 15%);
+    }
+    50% {
+      box-shadow: 0 0 72px -4px color-mix(in oklch, var(--primary), transparent 0%);
+    }
+  }
+  @keyframes float-bob {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+  @keyframes twinkle {
+    0%,
+    100% {
+      opacity: 0;
+      transform: scale(0.4);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .animate-spin-slow {
+    animation: spin-slow 10s linear infinite;
+  }
+  .animate-pulse-glow {
+    animation: pulse-glow 3s ease-in-out infinite;
+  }
+  .animate-float-bob {
+    animation: float-bob 3.2s ease-in-out infinite;
+  }
+  .animate-twinkle {
+    animation: twinkle 2.2s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-spin-slow,
+    .animate-pulse-glow,
+    .animate-float-bob,
+    .animate-twinkle {
+      animation: none;
+    }
+  }
 }
