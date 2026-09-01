@@ -9,6 +9,44 @@ const AUTO_SCROLL_INTERVAL_MS = 4000;
 // Any manual interaction (click, drag, hover) pauses auto-scroll for this long.
 const RESUME_DELAY_MS = 6000;
 
+// Cycling gradient pairs from the site's own brand palette — an original
+// "cover art" per category instead of a licensed game screenshot, which
+// we can't legally source or redistribute for third-party titles.
+const COVER_GRADIENTS = [
+  ["var(--primary)", "var(--pink)"],
+  ["var(--purple)", "var(--blue)"],
+  ["var(--blue)", "var(--green)"],
+  ["var(--amber)", "var(--primary)"],
+  ["var(--pink)", "var(--purple)"],
+  ["var(--green)", "var(--blue)"],
+];
+
+function CategoryCoverArt({ icon, index }: { icon: string; index: number }) {
+  const [from, to] = COVER_GRADIENTS[index % COVER_GRADIENTS.length];
+  return (
+    <div
+      className="relative flex h-28 items-center justify-center overflow-hidden"
+      style={{ backgroundImage: `linear-gradient(135deg, ${from}, ${to})` }}
+      aria-hidden
+    >
+      <div
+        className="absolute inset-0 opacity-[0.15]"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(45deg, white 0, white 1px, transparent 1px, transparent 10px)",
+        }}
+      />
+      <span
+        className="absolute -right-3 -bottom-4 text-8xl opacity-25 drop-shadow-lg"
+        style={{ transform: "rotate(-12deg)" }}
+      >
+        {icon}
+      </span>
+      <span className="relative text-4xl drop-shadow-lg">{icon}</span>
+    </div>
+  );
+}
+
 export function CategoriesSection({
   gameCategories,
 }: {
@@ -113,14 +151,20 @@ export function CategoriesSection({
           <div
             key={cat.title}
             className={cn(
-              "card-border w-72 shrink-0 snap-start rounded-xl p-5 transition-shadow sm:w-[calc((100%-2.5rem)/2)] lg:w-[calc((100%-5rem)/3)]",
+              "card-border w-72 shrink-0 snap-start overflow-hidden rounded-xl transition-shadow sm:w-[calc((100%-2.5rem)/2)] lg:w-[calc((100%-5rem)/3)]",
               i === active && "ring-1 ring-purple/40",
             )}
           >
-            <div className="mb-3 text-2xl">{cat.icon}</div>
-            <p className="text-[10px] font-bold tracking-wide text-purple uppercase">{cat.tag}</p>
-            <p className="mt-1 font-display font-bold">{cat.title}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{cat.description}</p>
+            <div className="relative">
+              <CategoryCoverArt icon={cat.icon} index={i} />
+              <span className="absolute top-2 left-2 rounded-full bg-black/40 px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase backdrop-blur-sm">
+                {cat.tag}
+              </span>
+            </div>
+            <div className="p-5">
+              <p className="font-display font-bold">{cat.title}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{cat.description}</p>
+            </div>
           </div>
         ))}
       </div>
