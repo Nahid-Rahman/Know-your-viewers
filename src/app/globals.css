@@ -276,6 +276,17 @@
     border: 1px solid var(--border);
   }
 
+  /* Hides the scrollbar on horizontally-scrollable strips (categories,
+     reward pool) while keeping the element genuinely scrollable via touch,
+     wheel, and drag — the dots/arrows are the visible affordance instead. */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Hero reward orb: rotating ring, breathing glow, floating badges, sparkles. */
   @keyframes spin-slow {
     to {

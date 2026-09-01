@@ -89,7 +89,7 @@ export function RewardRouletteSection({
           Click the spin button to roll for your viewer reward.
         </p>
 
-        <div className="mt-10 flex items-center justify-center gap-3 overflow-x-auto pb-2">
+        <div className="scrollbar-none mt-10 flex items-center justify-center gap-3 overflow-x-auto pb-2">
           {rewardPool.map((reward, i) => (
             <div
               key={reward.label}
