@@ -55,7 +55,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-7">
+    <div className="glow-primary rounded-2xl border border-border bg-card p-7">
       <h1 className="font-display text-xl font-bold">Create an account</h1>
       <p className="mt-1 text-sm text-muted-foreground">For research staff and streamer partners.</p>
 
