@@ -1,7 +1,7 @@
 import type { Rarity } from "@/components/common/rarity-badge";
 
 export type TrustBadge = { icon: string; title: string; description: string };
-export type GameCategory = { tag: string; title: string; description: string };
+export type GameCategory = { icon: string; tag: string; title: string; description: string };
 export type RewardPoolItem = { label: string; sub: string; rarity: Rarity };
 export type FaqItem = { q: string; a: string };
 export type NavLink = { href: string; label: string };

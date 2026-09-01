@@ -5,14 +5,21 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { EyebrowLabel } from "@/components/common/eyebrow-label";
 import { cn } from "@/lib/utils";
 
+const AUTO_SCROLL_INTERVAL_MS = 4000;
+// Any manual interaction (click, drag, hover) pauses auto-scroll for this long.
+const RESUME_DELAY_MS = 6000;
+
 export function CategoriesSection({
   gameCategories,
 }: {
-  gameCategories: { tag: string; title: string; description: string }[];
+  gameCategories: { icon: string; tag: string; title: string; description: string }[];
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
   const count = gameCategories.length;
+  // Timestamp until which auto-scroll should stay paused — a ref so ticking
+  // it doesn't cause re-renders.
+  const pausedUntilRef = useRef(0);
 
   function scrollToIndex(index: number) {
     const track = trackRef.current;
@@ -22,9 +29,18 @@ export function CategoriesSection({
   }
 
   function go(delta: number) {
-    const next = (active + delta + count) % count;
-    setActive(next);
-    scrollToIndex(next);
+    setActive((current) => {
+      const next = (current + delta + count) % count;
+      scrollToIndex(next);
+      return next;
+    });
+  }
+
+  function pauseAutoScroll() {
+    // Only ever invoked from event handlers/effects, never during render —
+    // safe despite the impure-call lint rule being conservative here.
+    // eslint-disable-next-line react-hooks/purity
+    pausedUntilRef.current = Date.now() + RESUME_DELAY_MS;
   }
 
   // Keep the dots/highlight in sync with manual swipe/drag/wheel scrolling.
@@ -54,11 +70,27 @@ export function CategoriesSection({
     }
 
     track.addEventListener("scroll", onScroll, { passive: true });
+    track.addEventListener("pointerdown", pauseAutoScroll);
     return () => {
       track.removeEventListener("scroll", onScroll);
+      track.removeEventListener("pointerdown", pauseAutoScroll);
       if (frame !== null) cancelAnimationFrame(frame);
     };
   }, []);
+
+  // Auto-advance one card at a time, skipped for prefers-reduced-motion and
+  // paused for a while after any manual interaction.
+  useEffect(() => {
+    if (count <= 1) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const id = setInterval(() => {
+      if (Date.now() < pausedUntilRef.current) return;
+      go(1);
+    }, AUTO_SCROLL_INTERVAL_MS);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [count]);
 
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6">
@@ -74,6 +106,7 @@ export function CategoriesSection({
 
       <div
         ref={trackRef}
+        onMouseEnter={pauseAutoScroll}
         className="scrollbar-none flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth pb-2"
       >
         {gameCategories.map((cat, i) => (
@@ -84,7 +117,7 @@ export function CategoriesSection({
               i === active && "ring-1 ring-purple/40",
             )}
           >
-            <div className="mb-3 text-2xl">🎮</div>
+            <div className="mb-3 text-2xl">{cat.icon}</div>
             <p className="text-[10px] font-bold tracking-wide text-purple uppercase">{cat.tag}</p>
             <p className="mt-1 font-display font-bold">{cat.title}</p>
             <p className="mt-1 text-xs text-muted-foreground">{cat.description}</p>
@@ -97,7 +130,10 @@ export function CategoriesSection({
           <button
             type="button"
             aria-label="Previous category"
-            onClick={() => go(-1)}
+            onClick={() => {
+              pauseAutoScroll();
+              go(-1);
+            }}
             className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-foreground"
           >
             <ChevronLeft className="size-4" />
@@ -109,6 +145,7 @@ export function CategoriesSection({
                 type="button"
                 aria-label={`Show ${cat.title}`}
                 onClick={() => {
+                  pauseAutoScroll();
                   setActive(i);
                   scrollToIndex(i);
                 }}
@@ -122,7 +159,10 @@ export function CategoriesSection({
           <button
             type="button"
             aria-label="Next category"
-            onClick={() => go(1)}
+            onClick={() => {
+              pauseAutoScroll();
+              go(1);
+            }}
             className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-foreground"
           >
             <ChevronRight className="size-4" />

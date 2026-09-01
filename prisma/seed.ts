@@ -34,19 +34,46 @@ async function main() {
       ],
       gameCategories: [
         {
+          icon: "🎯",
           tag: "ACTIVE POOL",
           title: "Valorant-style Tactical FPS",
           description: "Fast paced competitive shooter category.",
         },
         {
+          icon: "🪂",
           tag: "MOBILE POOL",
           title: "PUBG Mobile Battle Royale",
           description: "Survival drop category for mobile viewers.",
         },
         {
+          icon: "🔫",
           tag: "MOBILE POOL",
           title: "COD Mobile FPS",
           description: "Action shooter category for livestream viewers.",
+        },
+        {
+          icon: "🔥",
+          tag: "MOBILE POOL",
+          title: "Free Fire Battle Royale",
+          description: "Fast-paced mobile battle royale category for livestream viewers.",
+        },
+        {
+          icon: "⚔️",
+          tag: "MOBILE POOL",
+          title: "Mobile Legends: Bang Bang",
+          description: "5v5 MOBA category popular with mobile esports viewers.",
+        },
+        {
+          icon: "💣",
+          tag: "PC POOL",
+          title: "CS-style Competitive Shooter",
+          description: "Tactical PC multiplayer shooter category.",
+        },
+        {
+          icon: "⛏️",
+          tag: "PC POOL",
+          title: "Minecraft Multiplayer",
+          description: "Sandbox survival and building category for PC streams.",
         },
       ],
       rewardPool: [

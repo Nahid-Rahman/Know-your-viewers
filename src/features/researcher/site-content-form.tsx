@@ -20,7 +20,9 @@ const schema = z.object({
   claimedCount: z.string().min(1, "Required."),
   countdownSeconds: z.number().int().min(0),
   trustBadges: z.array(z.object({ icon: z.string().min(1), title: z.string().min(1), description: z.string().min(1) })),
-  gameCategories: z.array(z.object({ tag: z.string().min(1), title: z.string().min(1), description: z.string().min(1) })),
+  gameCategories: z.array(
+    z.object({ icon: z.string().min(1), tag: z.string().min(1), title: z.string().min(1), description: z.string().min(1) }),
+  ),
   rewardPool: z.array(
     z.object({
       label: z.string().min(1),
@@ -113,10 +115,11 @@ export function SiteContentForm({ content }: { content: LandingContentValues }) 
 
       <Section
         title="Game categories"
-        onAdd={() => gameCategories.append({ tag: "", title: "", description: "" })}
+        onAdd={() => gameCategories.append({ icon: "🎮", tag: "", title: "", description: "" })}
       >
         {gameCategories.fields.map((field, i) => (
           <div key={field.id} className="flex items-start gap-2 rounded-lg border border-border p-3">
+            <Input className="w-16" placeholder="Icon" {...form.register(`gameCategories.${i}.icon`)} />
             <Input className="w-32" placeholder="Tag" {...form.register(`gameCategories.${i}.tag`)} />
             <Input placeholder="Title" {...form.register(`gameCategories.${i}.title`)} />
             <Input placeholder="Description" {...form.register(`gameCategories.${i}.description`)} />
