@@ -37,7 +37,13 @@ const siteContentSchema = z.object({
   countdownSeconds: z.coerce.number().int().min(0),
   trustBadges: z.array(z.object({ icon: z.string().min(1), title: z.string().min(1), description: z.string().min(1) })),
   gameCategories: z.array(
-    z.object({ icon: z.string().min(1), tag: z.string().min(1), title: z.string().min(1), description: z.string().min(1) }),
+    z.object({
+      icon: z.string().min(1),
+      image: z.string().min(1),
+      tag: z.string().min(1),
+      title: z.string().min(1),
+      description: z.string().min(1),
+    }),
   ),
   rewardPool: z.array(
     z.object({

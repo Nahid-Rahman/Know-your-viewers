@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { EyebrowLabel } from "@/components/common/eyebrow-label";
 import { cn } from "@/lib/utils";
@@ -9,40 +10,18 @@ const AUTO_SCROLL_INTERVAL_MS = 4000;
 // Any manual interaction (click, drag, hover) pauses auto-scroll for this long.
 const RESUME_DELAY_MS = 6000;
 
-// Cycling gradient pairs from the site's own brand palette — an original
-// "cover art" per category instead of a licensed game screenshot, which
-// we can't legally source or redistribute for third-party titles.
-const COVER_GRADIENTS = [
-  ["var(--primary)", "var(--pink)"],
-  ["var(--purple)", "var(--blue)"],
-  ["var(--blue)", "var(--green)"],
-  ["var(--amber)", "var(--primary)"],
-  ["var(--pink)", "var(--purple)"],
-  ["var(--green)", "var(--blue)"],
-];
-
-function CategoryCoverArt({ icon, index }: { icon: string; index: number }) {
-  const [from, to] = COVER_GRADIENTS[index % COVER_GRADIENTS.length];
+function CategoryCoverArt({ icon, image, title }: { icon: string; image: string; title: string }) {
   return (
-    <div
-      className="relative flex h-28 items-center justify-center overflow-hidden"
-      style={{ backgroundImage: `linear-gradient(135deg, ${from}, ${to})` }}
-      aria-hidden
-    >
-      <div
-        className="absolute inset-0 opacity-[0.15]"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(45deg, white 0, white 1px, transparent 1px, transparent 10px)",
-        }}
+    <div className="relative h-28 overflow-hidden">
+      <Image
+        src={image}
+        alt={title}
+        fill
+        sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+        className="object-cover"
       />
-      <span
-        className="absolute -right-3 -bottom-4 text-8xl opacity-25 drop-shadow-lg"
-        style={{ transform: "rotate(-12deg)" }}
-      >
-        {icon}
-      </span>
-      <span className="relative text-4xl drop-shadow-lg">{icon}</span>
+      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+      <span className="absolute right-2 bottom-2 text-3xl drop-shadow-lg">{icon}</span>
     </div>
   );
 }
@@ -50,7 +29,7 @@ function CategoryCoverArt({ icon, index }: { icon: string; index: number }) {
 export function CategoriesSection({
   gameCategories,
 }: {
-  gameCategories: { icon: string; tag: string; title: string; description: string }[];
+  gameCategories: { icon: string; image: string; tag: string; title: string; description: string }[];
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
@@ -156,7 +135,7 @@ export function CategoriesSection({
             )}
           >
             <div className="relative">
-              <CategoryCoverArt icon={cat.icon} index={i} />
+              <CategoryCoverArt icon={cat.icon} image={cat.image} title={cat.title} />
               <span className="absolute top-2 left-2 rounded-full bg-black/40 px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase backdrop-blur-sm">
                 {cat.tag}
               </span>

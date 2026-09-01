@@ -18,7 +18,7 @@ const FALLBACK_CONTENT = {
   claimedCount: "247,000+",
   countdownSeconds: 23 * 3600 + 48 * 60 + 21,
   trustBadges: [] as { icon: string; title: string; description: string }[],
-  gameCategories: [] as { icon: string; tag: string; title: string; description: string }[],
+  gameCategories: [] as { icon: string; image: string; tag: string; title: string; description: string }[],
   rewardPool: [] as { label: string; sub: string; rarity: Rarity }[],
   gameTypeOptions: [] as string[],
   watchFrequencyOptions: [] as string[],
