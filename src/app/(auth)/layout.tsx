@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Zap } from "lucide-react";
+import { PageTransition } from "@/components/common/page-transition";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -23,7 +24,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           LiveDrop<span className="text-primary">Arena</span>
         </span>
       </Link>
-      <div className="relative z-10 w-full max-w-sm">{children}</div>
+      <div className="relative z-10 w-full max-w-sm">
+        <PageTransition>{children}</PageTransition>
+      </div>
       <p className="relative z-10 mt-8 max-w-sm text-center text-xs text-muted-foreground">
         This login is for research staff and streamer partners only. Participants never need an
         account.

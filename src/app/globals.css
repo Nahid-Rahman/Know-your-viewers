@@ -221,9 +221,16 @@
   html {
     @apply font-sans;
     color-scheme: dark;
+    scroll-behavior: smooth;
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
   }
 }
 

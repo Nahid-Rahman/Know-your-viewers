@@ -6,6 +6,7 @@ import { Menu, Zap, LogOut } from "lucide-react";
 import { SidebarNav, type NavItem } from "@/components/layout/sidebar-nav";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { PageTransition } from "@/components/common/page-transition";
 import { cn } from "@/lib/utils";
 
 export function AppShell({
@@ -93,7 +94,9 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 overflow-x-hidden p-4 md:p-8">{children}</main>
+        <main className="flex-1 overflow-x-hidden p-4 md:p-8">
+          <PageTransition>{children}</PageTransition>
+        </main>
       </div>
     </div>
   );
