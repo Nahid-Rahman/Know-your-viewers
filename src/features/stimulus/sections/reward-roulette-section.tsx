@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { EyebrowLabel } from "@/components/common/eyebrow-label";
 import { RarityBadge, type Rarity } from "@/components/common/rarity-badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,19 @@ const RARITY_EMOJI: Record<Rarity, string> = {
   premium: "💎",
 };
 
+// Reel geometry — every tile is the same fixed size, so the strip position
+// (not tile scale) is what carries the "landed" state. TILE_W/GAP must match
+// the w-36/gap-3 classes below, and SPIN_DURATION_MS must match the
+// duration-[…] transition class, since JS times the landing off of it.
+const TILE_W = 144;
+const GAP = 12;
+const PITCH = TILE_W + GAP;
+const SPIN_LOOPS = 4;
+const LOOP_PAD = 3;
+const REPEAT = 12;
+const SPIN_DURATION_MS = 3200;
+const REDUCED_MOTION_DURATION_MS = 400;
+
 export function RewardRouletteSection({
   config,
   rewardPool,
@@ -36,16 +49,17 @@ export function RewardRouletteSection({
   gameTypeOptions: string[];
   watchFrequencyOptions: string[];
 }) {
-  const [activeIndex, setActiveIndex] = useState(() => {
+  const poolSize = rewardPool.length;
+  const [reelIndex, setReelIndex] = useState(() => {
     const i = rewardPool.findIndex((r) => r.label === "Viewer Drop");
-    return i === -1 ? 0 : i;
+    return LOOP_PAD * poolSize + (i === -1 ? 0 : i);
   });
   const [spinning, setSpinning] = useState(false);
+  const [instant, setInstant] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function handleSpin() {
-    if (spinning) return;
+    if (spinning || poolSize === 0) return;
     setSpinning(true);
     void logEngagementEvent("SPIN_CLICKED");
 
@@ -55,35 +69,35 @@ export function RewardRouletteSection({
     const pool = candidates.length ? candidates : rewardPool;
     const target = pool[Math.floor(Math.random() * pool.length)];
     const targetIndex = rewardPool.indexOf(target);
-    let ticks = 0;
-    const totalTicks = 18;
-    const tick = () => {
-      ticks += 1;
-      setActiveIndex((i) => (i + 1) % rewardPool.length);
-      if (ticks >= totalTicks) {
-        if (timerRef.current) clearTimeout(timerRef.current);
-        setActiveIndex(targetIndex);
-        setSpinning(false);
-        setTimeout(() => {
-          setModalOpen(true);
-          void logEngagementEvent("MODAL_OPENED");
-        }, 350);
-        return;
-      }
-    };
 
-    let delay = 70;
-    const step = () => {
-      tick();
-      if (ticks < totalTicks) {
-        delay += 12;
-        timerRef.current = setTimeout(step, delay);
-      }
-    };
-    step();
+    const reduced =
+      typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const duration = reduced ? REDUCED_MOTION_DURATION_MS : SPIN_DURATION_MS;
+    const loops = reduced ? 1 : SPIN_LOOPS;
+
+    setReelIndex((current) => {
+      const currentMod = current % poolSize;
+      const delta = ((targetIndex - currentMod) + poolSize) % poolSize || poolSize;
+      return current + loops * poolSize + delta;
+    });
+
+    window.setTimeout(() => {
+      setSpinning(false);
+      // Snap the strip back to an early lap (same reward, since the strip
+      // just repeats the pool) so the array position never grows unbounded.
+      setReelIndex((current) => LOOP_PAD * poolSize + (current % poolSize));
+      setInstant(true);
+      requestAnimationFrame(() => requestAnimationFrame(() => setInstant(false)));
+
+      setTimeout(() => {
+        setModalOpen(true);
+        void logEngagementEvent("MODAL_OPENED");
+      }, 250);
+    }, duration);
   }
 
-  const selected = rewardPool[activeIndex];
+  const selected = rewardPool[reelIndex % poolSize] ?? rewardPool[0];
+  const stripItems = Array.from({ length: REPEAT * poolSize }, (_, i) => rewardPool[i % poolSize]);
 
   return (
     <section
@@ -103,41 +117,64 @@ export function RewardRouletteSection({
           Click the spin button to roll for your viewer reward.
         </p>
 
-        <div className="scrollbar-none mt-10 flex items-center justify-center gap-3 overflow-x-auto pb-2">
-          {rewardPool.map((reward, i) => {
-            const accent = RARITY_ACCENT[reward.rarity];
-            const isActive = i === activeIndex;
-            return (
-              <div
-                key={reward.label}
-                className={cn(
-                  "relative w-36 shrink-0 rounded-2xl border p-4 text-left transition-all duration-300",
-                  isActive
-                    ? cn(
-                        "scale-110 border-2",
-                        spinning ? "animate-tick-flash" : "animate-tile-land",
-                      )
-                    : "scale-95 border-border-strong/50 opacity-60",
-                )}
-                style={
-                  isActive
-                    ? {
-                        borderColor: accent,
-                        boxShadow: `0 0 32px -6px ${accent}`,
-                        background: `linear-gradient(160deg, color-mix(in oklch, ${accent}, transparent 85%), var(--card))`,
-                      }
-                    : undefined
-                }
-              >
-                <span className="text-lg" aria-hidden>
-                  {RARITY_EMOJI[reward.rarity]}
-                </span>
-                <RarityBadge rarity={reward.rarity} className="mt-1 block" />
-                <p className="mt-2 text-sm font-bold font-display">{reward.label}</p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">{reward.sub}</p>
-              </div>
-            );
-          })}
+        <div
+          className="relative mx-auto mt-10 max-w-2xl overflow-hidden py-2"
+          style={{
+            maskImage: "linear-gradient(90deg, transparent, black 12%, black 88%, transparent)",
+            WebkitMaskImage: "linear-gradient(90deg, transparent, black 12%, black 88%, transparent)",
+          }}
+        >
+          {/* Landing-slot pointer, like a prize wheel's fixed marker. */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center">
+            <div className="h-0 w-0 border-x-8 border-t-[10px] border-x-transparent border-t-primary" />
+          </div>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center">
+            <div className="h-0 w-0 border-x-8 border-b-[10px] border-x-transparent border-b-primary" />
+          </div>
+
+          <div
+            className={cn("flex gap-3", !instant && "transition-transform ease-[cubic-bezier(0.15,0.85,0.25,1)]")}
+            style={{
+              transform: `translateX(calc(50% - ${TILE_W / 2}px - ${reelIndex * PITCH}px))`,
+              transitionDuration: instant ? "0ms" : `${SPIN_DURATION_MS}ms`,
+            }}
+          >
+            {stripItems.map((reward, i) => {
+              const accent = RARITY_ACCENT[reward.rarity];
+              const isActive = i === reelIndex;
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    "flex h-40 w-36 shrink-0 flex-col justify-between rounded-2xl border p-4 text-left",
+                    isActive
+                      ? cn("border-2", spinning ? "animate-tick-flash" : "animate-tile-land")
+                      : "border-border-strong/50 opacity-50",
+                  )}
+                  style={
+                    isActive
+                      ? {
+                          borderColor: accent,
+                          boxShadow: `0 0 32px -6px ${accent}`,
+                          background: `linear-gradient(160deg, color-mix(in oklch, ${accent}, transparent 85%), var(--card))`,
+                        }
+                      : undefined
+                  }
+                >
+                  <div>
+                    <span className="text-lg" aria-hidden>
+                      {RARITY_EMOJI[reward.rarity]}
+                    </span>
+                    <RarityBadge rarity={reward.rarity} className="mt-1 block" />
+                  </div>
+                  <div>
+                    <p className="line-clamp-2 font-display text-sm font-bold">{reward.label}</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">{reward.sub}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         <Button
