@@ -12,7 +12,7 @@ const RESUME_DELAY_MS = 6000;
 
 function CategoryCoverArt({ icon, image, title }: { icon: string; image: string; title: string }) {
   return (
-    <div className="relative h-28 overflow-hidden">
+    <div className="relative h-52 overflow-hidden sm:h-56">
       <Image
         src={image}
         alt={title}

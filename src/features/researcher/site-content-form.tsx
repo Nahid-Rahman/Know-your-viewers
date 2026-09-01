@@ -122,7 +122,7 @@ export function SiteContentForm({ content }: { content: LandingContentValues }) 
       <Section
         title="Game categories"
         onAdd={() =>
-          gameCategories.append({ icon: "🎮", image: "/images/categories/esports-setup.jpg", tag: "", title: "", description: "" })
+          gameCategories.append({ icon: "🎮", image: "/images/categories/cs-shooter.jpg", tag: "", title: "", description: "" })
         }
       >
         {gameCategories.fields.map((field, i) => (
