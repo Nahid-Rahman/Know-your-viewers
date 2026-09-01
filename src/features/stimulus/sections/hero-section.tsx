@@ -27,7 +27,7 @@ export function HeroSection({
             <RichHeadline text={content.heroHeadline} />
           </h1>
 
-          <p className="mt-5 max-w-md text-muted-foreground">{content.heroSubtext}</p>
+          <p className="mt-5 max-w-md text-base text-muted-foreground sm:text-lg">{content.heroSubtext}</p>
 
           {config.urgencyEnabled && (
             <div className="mt-6">
@@ -42,19 +42,19 @@ export function HeroSection({
             >
               TRY YOUR LUCK
             </Link>
-            <Link href="/#how-it-works" className="text-sm font-semibold text-muted-foreground hover:text-foreground">
+            <Link href="/#how-it-works" className="text-base font-semibold text-muted-foreground hover:text-foreground">
               How it works &rarr;
             </Link>
           </div>
 
           {config.socialProofEnabled && (
-            <p className="mt-6 text-sm text-muted-foreground">
+            <p className="mt-6 text-base text-muted-foreground">
               <span className="font-semibold text-foreground">{content.claimedCount}</span> players
               have already claimed rewards
             </p>
           )}
 
-          <p className="mt-4 text-xs text-muted-foreground">
+          <p className="mt-4 text-sm text-muted-foreground">
             🔒 No password needed &nbsp; 📱 Mobile friendly &nbsp; 👤 Follow-up by admin
           </p>
         </div>
