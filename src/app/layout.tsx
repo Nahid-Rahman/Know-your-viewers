@@ -39,6 +39,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`dark ${fontDisplay.variable} ${fontBody.variable} h-full antialiased`}
       style={{ "--font-mono": monoStack } as React.CSSProperties}
     >
