@@ -35,7 +35,7 @@ const PITCH = TILE_W + GAP;
 const REPEAT = 12;
 const WRAP_PAD_LOOPS = 5;
 const SPIN_LOOPS = 4;
-const SPIN_DURATION_MS = 3200;
+const SPIN_DURATION_MS = 2500;
 const REDUCED_MOTION_SPIN_MS = 400;
 const IDLE_SPEED_PX_PER_MS = 0.022;
 
