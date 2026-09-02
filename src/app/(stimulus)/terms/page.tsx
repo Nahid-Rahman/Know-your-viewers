@@ -42,7 +42,7 @@ export default async function TermsPage() {
         </div>
       </div>
 
-      <div id="privacy" className="mt-14 grid gap-6 md:grid-cols-2">
+      <div id="privacy" className="mt-14 scroll-mt-[69px] grid gap-6 md:grid-cols-2">
         <div className="card-border rounded-xl p-6">
           <p className="mb-3 text-xs font-semibold text-blue">{terms.section1Eyebrow}</p>
           <h2 className="mb-3 text-lg font-bold">{terms.section1Title}</h2>
