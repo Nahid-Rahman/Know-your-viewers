@@ -137,7 +137,11 @@ export default async function AboutPage() {
       </section>
 
       <div className="mt-14 flex flex-wrap justify-center gap-4">
-        <Link href="/" className={cn(buttonVariants({ size: "lg" }), "bg-gradient-primary text-white hover:opacity-90")}>
+        <Link
+          href="/"
+          prefetch={false}
+          className={cn(buttonVariants({ size: "lg" }), "bg-gradient-primary text-white hover:opacity-90")}
+        >
           &larr; Back to Event
         </Link>
         <Link href="/support" className={cn(buttonVariants({ size: "lg", variant: "outline" }))}>

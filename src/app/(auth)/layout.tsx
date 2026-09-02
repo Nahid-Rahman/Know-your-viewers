@@ -16,7 +16,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         style={{ backgroundImage: "radial-gradient(circle, var(--purple), transparent 70%)" }}
       />
 
-      <Link href="/" className="relative z-10 mb-8 flex items-center gap-2">
+      <Link href="/" prefetch={false} className="relative z-10 mb-8 flex items-center gap-2">
         <span className="flex size-9 items-center justify-center rounded-lg bg-gradient-primary">
           <Zap className="size-4 text-white" fill="currentColor" />
         </span>

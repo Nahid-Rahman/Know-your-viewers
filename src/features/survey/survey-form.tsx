@@ -45,7 +45,11 @@ export function SurveyForm({ survey }: { survey: Survey }) {
         <p className="mt-2 text-sm text-muted-foreground">
           Your responses have been recorded as part of this research study.
         </p>
-        <Link href="/" className={cn(buttonVariants(), "mt-6 bg-gradient-primary text-white hover:opacity-90")}>
+        <Link
+          href="/"
+          prefetch={false}
+          className={cn(buttonVariants(), "mt-6 bg-gradient-primary text-white hover:opacity-90")}
+        >
           Return to the event page
         </Link>
       </div>

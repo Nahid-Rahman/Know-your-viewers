@@ -25,7 +25,7 @@ export function AppShell({
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const brand = (
-    <Link href="/" className="flex items-center gap-2 px-3 py-4">
+    <Link href="/" prefetch={false} className="flex items-center gap-2 px-3 py-4">
       <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-primary">
         <Zap className="size-4 text-white" fill="currentColor" />
       </span>
@@ -53,6 +53,7 @@ export function AppShell({
         <div className="border-t border-sidebar-border p-3">
           <Link
             href="/"
+            prefetch={false}
             className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
           >
             <LogOut className="size-4" />

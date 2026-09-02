@@ -9,7 +9,7 @@ export async function SiteFooter() {
   return (
     <footer className="mt-24 border-t border-border">
       <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-4 px-4 py-10 sm:flex-row sm:justify-between">
-        <Link href="/" className="flex items-center gap-2 font-display text-sm font-bold">
+        <Link href="/" prefetch={false} className="flex items-center gap-2 font-display text-sm font-bold">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-brand text-xs text-white">
             ▲
           </span>
@@ -18,7 +18,12 @@ export async function SiteFooter() {
 
         <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
           {links.map((link, i) => (
-            <Link key={`${link.href}-${link.label}-${i}`} href={link.href} className="hover:text-foreground">
+            <Link
+              key={`${link.href}-${link.label}-${i}`}
+              href={link.href}
+              prefetch={link.href.startsWith("/#") || link.href === "/" ? false : undefined}
+              className="hover:text-foreground"
+            >
               {link.label}
             </Link>
           ))}

@@ -106,7 +106,11 @@ export default function DebriefPage() {
             Continue to a short optional survey
             <ArrowRight data-icon="inline-end" />
           </Button>
-          <Link href="/" className={cn(buttonVariants({ variant: "outline", size: "default" }), "h-11 flex-1")}>
+          <Link
+            href="/"
+            prefetch={false}
+            className={cn(buttonVariants({ variant: "outline", size: "default" }), "h-11 flex-1")}
+          >
             <ArrowLeft data-icon="inline-start" />
             Finish without survey
           </Link>

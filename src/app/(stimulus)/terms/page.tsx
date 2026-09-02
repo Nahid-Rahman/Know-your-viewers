@@ -113,7 +113,11 @@ export default async function TermsPage() {
             <p className="mb-6 text-sm text-muted-foreground">{terms.ctaDescription}</p>
           </div>
           <div className="flex flex-col gap-3">
-            <Link href="/" className={cn(buttonVariants(), "bg-gradient-primary text-white hover:opacity-90")}>
+            <Link
+              href="/"
+              prefetch={false}
+              className={cn(buttonVariants(), "bg-gradient-primary text-white hover:opacity-90")}
+            >
               &larr; Back to Event
             </Link>
             <Link href="/support" className={cn(buttonVariants({ variant: "outline" }))}>

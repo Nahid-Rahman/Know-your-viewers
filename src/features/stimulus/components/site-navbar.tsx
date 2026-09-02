@@ -11,7 +11,7 @@ export async function SiteNavbar() {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border bg-background/85 backdrop-blur-md">
       <div className="mx-auto flex h-[69px] w-full max-w-6xl items-center justify-between px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-2 font-display text-lg font-bold">
+        <Link href="/" prefetch={false} className="flex items-center gap-2 font-display text-lg font-bold">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-brand text-white">
             ▲
           </span>
@@ -23,6 +23,7 @@ export async function SiteNavbar() {
             <Link
               key={`${link.href}-${i}`}
               href={link.href}
+              prefetch={link.href.startsWith("/#") || link.href === "/" ? false : undefined}
               className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               {link.label}
@@ -30,7 +31,11 @@ export async function SiteNavbar() {
           ))}
         </nav>
 
-        <Link href="/#spin" className={cn(buttonVariants(), "bg-gradient-primary text-white hover:opacity-90")}>
+        <Link
+          href="/#spin"
+          prefetch={false}
+          className={cn(buttonVariants(), "bg-gradient-primary text-white hover:opacity-90")}
+        >
           {ctaLabel}
         </Link>
       </div>
