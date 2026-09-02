@@ -34,7 +34,7 @@ export function HowItWorksSection() {
           accent="green"
           icon={<Mail className="size-5" />}
           title="Submit for Follow-up"
-          description="Provide your email or phone so the admin team can contact you after verification."
+          description="Provide your email and phone so the admin team can contact you after verification."
         />
       </div>
     </section>

@@ -19,20 +19,15 @@ export async function logEngagementEvent(type: EngagementEventType): Promise<voi
   await prisma.engagementEvent.create({ data: { participantId, type } }).catch(() => {});
 }
 
-const entrySchema = z
-  .object({
-    email: z.string().optional(),
-    phone: z.string().optional(),
-    streamNickname: z.string().optional(),
-    favouriteGameType: z.string().optional(),
-    livestreamFrequency: z.string().optional(),
-    rewardLabel: z.string(),
-    rewardRarity: z.enum(["common", "rare", "exceptional", "premium"]),
-  })
-  .refine((v) => Boolean(v.email?.trim() || v.phone?.trim()), {
-    message: "Enter an email or phone number so the team can reach you.",
-    path: ["email"],
-  });
+const entrySchema = z.object({
+  email: z.string().optional(),
+  phone: z.string().optional(),
+  streamNickname: z.string().optional(),
+  favouriteGameType: z.string().optional(),
+  livestreamFrequency: z.string().optional(),
+  rewardLabel: z.string(),
+  rewardRarity: z.enum(["common", "rare", "exceptional", "premium"]),
+});
 
 export type SubmitEntryValues = z.infer<typeof entrySchema>;
 
@@ -55,10 +50,14 @@ export async function submitEntry(
 
   const { email, phone, streamNickname, favouriteGameType, livestreamFrequency, rewardLabel, rewardRarity } =
     parsed.data;
-  const contactValue = email?.trim() || phone?.trim() || "";
+  const emailValue = email?.trim() || "";
+  const phoneValue = phone?.trim() || "";
 
-  if (participant.condition?.contactRequirement === "REQUIRED" && !contactValue) {
-    return { error: "This entry requires an email or phone number." };
+  // Both are required (not either/or) when the condition requires contact —
+  // some reward types (e.g. bKash) can only be paid out by phone, so an
+  // email alone isn't enough for follow-up.
+  if (participant.condition?.contactRequirement === "REQUIRED" && !(emailValue && phoneValue)) {
+    return { error: "This entry requires both an email and a phone number." };
   }
 
   await prisma.$transaction([
@@ -66,19 +65,21 @@ export async function submitEntry(
       where: { id: participant.id },
       data: { rewardLabel, rewardRarity: rewardRarity.toUpperCase() as Rarity },
     }),
-    ...(contactValue
+    ...(emailValue || phoneValue
       ? [
           prisma.participantContact.upsert({
             where: { participantId: participant.id },
             update: {
-              encryptedValue: encryptContact(contactValue),
+              encryptedValue: encryptContact(emailValue || phoneValue),
+              encryptedPhone: phoneValue ? encryptContact(phoneValue) : null,
               streamNickname: streamNickname || null,
               favouriteGameType: favouriteGameType || null,
               livestreamFrequency: livestreamFrequency || null,
             },
             create: {
               participantId: participant.id,
-              encryptedValue: encryptContact(contactValue),
+              encryptedValue: encryptContact(emailValue || phoneValue),
+              encryptedPhone: phoneValue ? encryptContact(phoneValue) : null,
               streamNickname: streamNickname || null,
               favouriteGameType: favouriteGameType || null,
               livestreamFrequency: livestreamFrequency || null,

@@ -22,6 +22,8 @@ import { getPublicSiteContent } from "@/lib/actions/site-content";
 import { DEFAULT_SITE_CONTENT, type EntryReceivedContent } from "@/lib/site-content-defaults";
 
 const DETAIL_ICONS = {
+  email: Mail,
+  phone: Mail,
   contact: Mail,
   streamNickname: ImageIcon,
   favouriteGameType: Gamepad2,
@@ -63,7 +65,12 @@ export default function SubmissionReceivedPage() {
   }
 
   const details: Array<{ key: keyof typeof DETAIL_ICONS; label: string; value: string }> = [
-    { key: "contact", label: "Email or Phone", value: entry.email || entry.phone || "-" },
+    ...(entry.email || entry.phone
+      ? [
+          ...(entry.email ? [{ key: "email" as const, label: "Email", value: entry.email }] : []),
+          ...(entry.phone ? [{ key: "phone" as const, label: "Phone", value: entry.phone }] : []),
+        ]
+      : [{ key: "contact" as const, label: "Email or Phone", value: "-" }]),
     { key: "streamNickname", label: "Stream Nickname", value: entry.streamNickname || "-" },
     { key: "favouriteGameType", label: "Favourite Game Type", value: entry.favouriteGameType || "-" },
     { key: "livestreamFrequency", label: "Livestream Frequency", value: entry.livestreamFrequency || "-" },

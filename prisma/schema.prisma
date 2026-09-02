@@ -204,7 +204,10 @@ model ParticipantContact {
   // Encrypted at rest with AES-256-GCM (see src/lib/crypto.ts). Never
   // decrypted for display in the researcher dashboard — only for an
   // outbound contact action a human researcher explicitly triggers.
+  // Both may be set — some reward types (e.g. bKash) can only be paid out
+  // by phone, so email alone isn't always enough for follow-up.
   encryptedValue  String
+  encryptedPhone  String?
   streamNickname  String?
   favouriteGameType String?
   livestreamFrequency String?

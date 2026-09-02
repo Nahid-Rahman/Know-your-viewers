@@ -174,14 +174,14 @@ export const DEFAULT_SITE_CONTENT: SiteContentValues = {
     steps: [
       { title: "Choose a Reward Pool", description: "Open the reward event and review the featured drop categories before you roll." },
       { title: "Spin the Reward Roll", description: "Hit SPIN and watch the carousel land on your viewer reward result." },
-      { title: "Submit for Follow-up", description: "Provide your email or phone so the admin team can contact you after verification." },
+      { title: "Submit for Follow-up", description: "Provide your email and phone so the admin team can contact you after verification." },
     ],
     infoRequiredEyebrow: "INFORMATION REQUIRED",
     infoRequiredTitle: "Only basic follow-up details",
     infoRequiredDescription:
       "We only collect the minimum information needed to process your reward drop and follow up with you.",
     requiredFields: [
-      "Email or phone number",
+      "Email and phone number",
       "Stream nickname",
       "Favourite game type",
       "Livestream watching frequency",
@@ -234,7 +234,7 @@ export const DEFAULT_SITE_CONTENT: SiteContentValues = {
     section2Description:
       "Only basic follow-up information is used to contact the participant and verify the viewer entry.",
     infoWeUse: [
-      { icon: "✉", label: "Email or phone number" },
+      { icon: "✉", label: "Email and phone number" },
       { icon: "☆", label: "Stream nickname" },
       { icon: "⚡", label: "Favourite game type" },
       { icon: "◎", label: "Livestream watching frequency" },

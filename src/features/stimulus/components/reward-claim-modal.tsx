@@ -29,10 +29,17 @@ function buildEntrySchema(contactRequired: boolean) {
     livestreamFrequency: z.string().optional(),
   });
   if (!contactRequired) return base;
-  return base.refine((v) => Boolean(v.email?.trim() || v.phone?.trim()), {
-    message: "Enter an email or phone number so the team can reach you.",
-    path: ["email"],
-  });
+  // Both are required (not either/or) — some reward types (e.g. bKash) can
+  // only be delivered to a phone number, so email alone isn't enough.
+  return base
+    .refine((v) => Boolean(v.email?.trim()), {
+      message: "Email is required so the team can reach you.",
+      path: ["email"],
+    })
+    .refine((v) => Boolean(v.phone?.trim()), {
+      message: "Phone number is required — some rewards (e.g. bKash) can only be delivered by phone.",
+      path: ["phone"],
+    });
 }
 
 type EntryValues = z.infer<ReturnType<typeof buildEntrySchema>>;
@@ -144,7 +151,7 @@ export function RewardClaimModal({
             <p className="text-sm font-bold">Complete your entry</p>
             <p className="text-xs text-muted-foreground">
               {contactRequired
-                ? "One contact method is required for follow-up."
+                ? "Email and phone number are both required for follow-up — some rewards (e.g. bKash) can only be delivered by phone."
                 : "Contact info is optional — leave blank to skip."}
             </p>
           </div>
@@ -159,6 +166,9 @@ export function RewardClaimModal({
                 onFocus={() => void logEngagementEvent("FIELD_FOCUSED")}
                 {...form.register("email")}
               />
+              {form.formState.errors.email && (
+                <p className="mt-1 text-xs text-destructive">{form.formState.errors.email.message}</p>
+              )}
             </div>
             <div>
               <LightFieldLabel htmlFor="entry-phone">
@@ -171,11 +181,11 @@ export function RewardClaimModal({
                 onFocus={() => void logEngagementEvent("FIELD_FOCUSED")}
                 {...form.register("phone")}
               />
+              {form.formState.errors.phone && (
+                <p className="mt-1 text-xs text-destructive">{form.formState.errors.phone.message}</p>
+              )}
             </div>
           </div>
-          {form.formState.errors.email && (
-            <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>
-          )}
 
           <div>
             <LightFieldLabel htmlFor="entry-nickname">Stream Nickname</LightFieldLabel>
@@ -213,9 +223,12 @@ export function RewardClaimModal({
           <div className="flex items-start gap-2.5 rounded-xl border border-green/25 bg-green/10 p-3.5">
             <span className="mt-0.5 shrink-0 text-green" aria-hidden>🛡</span>
             <p className="text-xs text-green">
-              <span className="font-bold">Safe follow-up only.</span> We only need one contact
-              method for follow-up. Never share your password, OTP, payment details, game login,
-              ID, full address, or account access.
+              <span className="font-bold">Safe follow-up only.</span>{" "}
+              {contactRequired
+                ? "We only use your email and phone number for follow-up."
+                : "We only use your contact details for follow-up."}{" "}
+              Never share your password, OTP, payment details, game login, ID, full address, or
+              account access.
             </p>
           </div>
 
