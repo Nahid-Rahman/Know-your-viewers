@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EyebrowLabel } from "@/components/common/eyebrow-label";
 import { RarityBadge, type Rarity } from "@/components/common/rarity-badge";
 import { Button } from "@/components/ui/button";
@@ -25,18 +25,23 @@ const RARITY_EMOJI: Record<Rarity, string> = {
   premium: "💎",
 };
 
-// Reel geometry — every tile is the same fixed size, so the strip position
-// (not tile scale) is what carries the "landed" state. TILE_W/GAP must match
-// the w-36/gap-3 classes below, and SPIN_DURATION_MS must match the
-// duration-[…] transition class, since JS times the landing off of it.
+// Reel geometry — TILE_W/GAP must match the w-36/gap-3 classes below. The
+// strip is driven entirely from JS (one persistent rAF loop, no CSS
+// transition) so it can idle-drift forever *and* smoothly accelerate into a
+// precise landing without the two motions fighting each other.
 const TILE_W = 144;
 const GAP = 12;
 const PITCH = TILE_W + GAP;
-const SPIN_LOOPS = 4;
-const LOOP_PAD = 3;
 const REPEAT = 12;
+const WRAP_PAD_LOOPS = 5;
+const SPIN_LOOPS = 4;
 const SPIN_DURATION_MS = 3200;
-const REDUCED_MOTION_DURATION_MS = 400;
+const REDUCED_MOTION_SPIN_MS = 400;
+const IDLE_SPEED_PX_PER_MS = 0.022;
+
+function easeOutCubic(t: number) {
+  return 1 - Math.pow(1 - t, 3);
+}
 
 export function RewardRouletteSection({
   config,
@@ -50,17 +55,94 @@ export function RewardRouletteSection({
   watchFrequencyOptions: string[];
 }) {
   const poolSize = rewardPool.length;
-  const [reelIndex, setReelIndex] = useState(() => {
+  const loopWidth = poolSize * PITCH;
+  const initialIndex = (() => {
     const i = rewardPool.findIndex((r) => r.label === "Viewer Drop");
-    return LOOP_PAD * poolSize + (i === -1 ? 0 : i);
-  });
+    return i === -1 ? 0 : i;
+  })();
+  const initialOffset = WRAP_PAD_LOOPS * loopWidth + initialIndex * PITCH;
+
+  const trackRef = useRef<HTMLDivElement>(null);
+  const offsetRef = useRef(initialOffset);
+  const modeRef = useRef<"idle" | "spinning">("idle");
+  const spinRef = useRef<{ start: number; startOffset: number; endOffset: number; duration: number } | null>(
+    null,
+  );
+
   const [spinning, setSpinning] = useState(false);
-  const [instant, setInstant] = useState(false);
+  // { abs: absolute index into the rendered strip (decides which tile glows),
+  //   mod: that same tile's reward index into rewardPool } — set together so
+  // a render never pairs a glow position with a mismatched "selected" reward.
+  const [active, setActive] = useState({ abs: WRAP_PAD_LOOPS * poolSize + initialIndex, mod: initialIndex });
+  const activeRef = useRef(active);
   const [modalOpen, setModalOpen] = useState(false);
 
+  function applyTransform(px: number) {
+    const track = trackRef.current;
+    if (track) track.style.transform = `translateX(calc(50% - ${TILE_W / 2}px - ${px}px))`;
+  }
+
+  function updateActiveFromOffset(px: number) {
+    const abs = Math.round(px / PITCH);
+    if (abs !== activeRef.current.abs) {
+      const mod = ((abs % poolSize) + poolSize) % poolSize;
+      activeRef.current = { abs, mod };
+      setActive({ abs, mod });
+    }
+  }
+
+  // Single persistent animation loop: idles (slow continuous drift) unless a
+  // spin is in progress, in which case it eases the strip toward the rigged
+  // landing offset instead. Runs for the component's whole lifetime so idle
+  // and spin motion never race each other.
+  useEffect(() => {
+    if (poolSize === 0) return;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let last = performance.now();
+    let id: number;
+
+    function frame(now: number) {
+      const spin = spinRef.current;
+      if (modeRef.current === "spinning" && spin) {
+        const t = Math.min(1, (now - spin.start) / spin.duration);
+        const px = spin.startOffset + (spin.endOffset - spin.startOffset) * easeOutCubic(t);
+        offsetRef.current = px;
+        applyTransform(px);
+        updateActiveFromOffset(px);
+        if (t >= 1) {
+          // Snap the strip back into the padded band (same reward at this
+          // offset, since the strip just repeats the pool) so the absolute
+          // index never grows unbounded — then re-derive active from THAT
+          // offset so the glow stays on the tile actually under the pointer.
+          offsetRef.current = ((spin.endOffset % loopWidth) + loopWidth) % loopWidth + WRAP_PAD_LOOPS * loopWidth;
+          applyTransform(offsetRef.current);
+          updateActiveFromOffset(offsetRef.current);
+          modeRef.current = "idle";
+          spinRef.current = null;
+          setSpinning(false);
+          setTimeout(() => {
+            setModalOpen(true);
+            void logEngagementEvent("MODAL_OPENED");
+          }, 250);
+        }
+      } else if (!reducedMotion) {
+        const dt = now - last;
+        offsetRef.current += IDLE_SPEED_PX_PER_MS * dt;
+        if (offsetRef.current >= (WRAP_PAD_LOOPS + 1) * loopWidth) offsetRef.current -= loopWidth;
+        applyTransform(offsetRef.current);
+        updateActiveFromOffset(offsetRef.current);
+      }
+      last = now;
+      id = requestAnimationFrame(frame);
+    }
+
+    id = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poolSize, loopWidth]);
+
   function handleSpin() {
-    if (spinning || poolSize === 0) return;
-    setSpinning(true);
+    if (modeRef.current === "spinning" || poolSize === 0) return;
     void logEngagementEvent("SPIN_CLICKED");
 
     // The reveal is rigged, not random: it lands on a reward matching the
@@ -70,33 +152,21 @@ export function RewardRouletteSection({
     const target = pool[Math.floor(Math.random() * pool.length)];
     const targetIndex = rewardPool.indexOf(target);
 
-    const reduced =
-      typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const duration = reduced ? REDUCED_MOTION_DURATION_MS : SPIN_DURATION_MS;
-    const loops = reduced ? 1 : SPIN_LOOPS;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const duration = reducedMotion ? REDUCED_MOTION_SPIN_MS : SPIN_DURATION_MS;
+    const loops = reducedMotion ? 1 : SPIN_LOOPS;
 
-    setReelIndex((current) => {
-      const currentMod = current % poolSize;
-      const delta = ((targetIndex - currentMod) + poolSize) % poolSize || poolSize;
-      return current + loops * poolSize + delta;
-    });
+    const startOffset = offsetRef.current;
+    const currentLoops = Math.floor(startOffset / loopWidth);
+    let endOffset = currentLoops * loopWidth + targetIndex * PITCH;
+    while (endOffset < startOffset + loops * loopWidth) endOffset += loopWidth;
 
-    window.setTimeout(() => {
-      setSpinning(false);
-      // Snap the strip back to an early lap (same reward, since the strip
-      // just repeats the pool) so the array position never grows unbounded.
-      setReelIndex((current) => LOOP_PAD * poolSize + (current % poolSize));
-      setInstant(true);
-      requestAnimationFrame(() => requestAnimationFrame(() => setInstant(false)));
-
-      setTimeout(() => {
-        setModalOpen(true);
-        void logEngagementEvent("MODAL_OPENED");
-      }, 250);
-    }, duration);
+    spinRef.current = { start: performance.now(), startOffset, endOffset, duration };
+    modeRef.current = "spinning";
+    setSpinning(true);
   }
 
-  const selected = rewardPool[reelIndex % poolSize] ?? rewardPool[0];
+  const selected = rewardPool[active.mod] ?? rewardPool[0];
   const stripItems = Array.from({ length: REPEAT * poolSize }, (_, i) => rewardPool[i % poolSize]);
 
   return (
@@ -133,15 +203,13 @@ export function RewardRouletteSection({
           </div>
 
           <div
-            className={cn("flex gap-3", !instant && "transition-transform ease-[cubic-bezier(0.15,0.85,0.25,1)]")}
-            style={{
-              transform: `translateX(calc(50% - ${TILE_W / 2}px - ${reelIndex * PITCH}px))`,
-              transitionDuration: instant ? "0ms" : `${SPIN_DURATION_MS}ms`,
-            }}
+            ref={trackRef}
+            className="flex gap-3"
+            style={{ transform: `translateX(calc(50% - ${TILE_W / 2}px - ${initialOffset}px))` }}
           >
             {stripItems.map((reward, i) => {
               const accent = RARITY_ACCENT[reward.rarity];
-              const isActive = i === reelIndex;
+              const isActive = i === active.abs;
               return (
                 <div
                   key={i}
