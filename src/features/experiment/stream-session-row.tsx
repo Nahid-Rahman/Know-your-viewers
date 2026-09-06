@@ -8,7 +8,10 @@ import type { StreamSessionRow as StreamSessionRowData } from "@/lib/queries/res
 
 function fmt(iso: string | null) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  // Fixed locale (not `undefined`) — this is a Client Component, so it renders once during
+  // SSR and again during hydration; letting the runtime's default locale decide risks a
+  // server/browser mismatch and a hydration error even though the visible result is correct.
+  return new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
 }
 
 export function StreamSessionRow({
