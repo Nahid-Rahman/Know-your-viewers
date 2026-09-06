@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Loader2Icon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { CopyableCode } from "@/components/common/copyable-code";
 import { ConfirmDeleteButton } from "@/components/common/confirm-delete-button";
@@ -46,9 +48,12 @@ export function TrackingLinkRow({
   }
 
   return (
-    <TableRow>
+    <TableRow className={cn(saving && "opacity-60 transition-opacity")}>
       <TableCell>
-        <CopyableCode value={link.uniqueCode} />
+        <div className="flex items-center gap-1.5">
+          <CopyableCode value={link.uniqueCode} />
+          {saving && <Loader2Icon className="size-3.5 animate-spin text-muted-foreground" />}
+        </div>
       </TableCell>
       <TableCell>
         <Select

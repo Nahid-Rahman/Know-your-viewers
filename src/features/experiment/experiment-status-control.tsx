@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Loader2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { setExperimentStatus } from "@/lib/actions/experiments";
 import type { ExperimentStatus } from "@/generated/prisma/enums";
@@ -47,6 +48,7 @@ export function ExperimentStatusControl({
     <div className="flex gap-2">
       {options.map((o) => (
         <Button key={o.next} size="sm" variant="outline" disabled={pending} onClick={() => transition(o.next)}>
+          {pending && <Loader2Icon className="size-3.5 animate-spin" data-icon="inline-start" />}
           {o.label}
         </Button>
       ))}

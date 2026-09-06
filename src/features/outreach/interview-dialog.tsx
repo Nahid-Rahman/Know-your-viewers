@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Loader2Icon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -215,6 +216,7 @@ export function InterviewDialog({ row }: { row: InterviewQueueRow }) {
               </div>
               <div className="mt-2 flex justify-end">
                 <Button type="button" size="sm" disabled={pending} onClick={saveConsent} className="bg-gradient-primary text-white hover:opacity-90">
+                  {pending && <Loader2Icon className="size-3.5 animate-spin" data-icon="inline-start" />}
                   Save consent &amp; status
                 </Button>
               </div>
@@ -278,10 +280,12 @@ export function InterviewDialog({ row }: { row: InterviewQueueRow }) {
               <div className="mt-2 flex flex-wrap justify-end gap-2">
                 {row.latestInterview && (
                   <Button type="button" size="sm" variant="outline" disabled={pending} onClick={saveNewInterviewRecord}>
+                    {pending && <Loader2Icon className="size-3.5 animate-spin" data-icon="inline-start" />}
                     Schedule new (reschedule)
                   </Button>
                 )}
                 <Button type="button" size="sm" disabled={pending} onClick={saveInterviewRecord} className="bg-gradient-primary text-white hover:opacity-90">
+                  {pending && <Loader2Icon className="size-3.5 animate-spin" data-icon="inline-start" />}
                   {row.latestInterview ? "Save interview record" : "Schedule interview"}
                 </Button>
               </div>
@@ -317,6 +321,7 @@ export function InterviewDialog({ row }: { row: InterviewQueueRow }) {
               </div>
               <div className="mt-2 flex justify-end">
                 <Button type="button" size="sm" disabled={pending} onClick={saveEligibility} className="bg-gradient-primary text-white hover:opacity-90">
+                  {pending && <Loader2Icon className="size-3.5 animate-spin" data-icon="inline-start" />}
                   Save eligibility
                 </Button>
               </div>

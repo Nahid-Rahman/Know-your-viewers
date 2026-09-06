@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Link from "next/link";
+import { Loader2Icon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/common/status-badge";
 import { Button } from "@/components/ui/button";
@@ -40,11 +42,14 @@ export function DebriefRow({ row }: { row: DebriefQueueRow }) {
   }
 
   return (
-    <TableRow>
+    <TableRow className={cn(saving && "opacity-60 transition-opacity")}>
       <TableCell className="font-mono text-xs">
-        <Link href={`/researcher/participants/${row.participantId}`} className="hover:underline">
-          {row.anonymousCode}
-        </Link>
+        <div className="flex items-center gap-1.5">
+          <Link href={`/researcher/participants/${row.participantId}`} className="hover:underline">
+            {row.anonymousCode}
+          </Link>
+          {saving && <Loader2Icon className="size-3.5 animate-spin text-muted-foreground" />}
+        </div>
       </TableCell>
       <TableCell className="text-sm text-muted-foreground">{row.streamerName ?? "—"}</TableCell>
       <TableCell><StatusBadge status={row.contactStatus} /></TableCell>
