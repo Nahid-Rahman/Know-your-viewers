@@ -17,6 +17,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import type {
   DebriefStatus,
   InterviewCandidateStatus,
+  InterviewConsentAnswer,
   ContactStatus,
   PrizeFulfillmentStatus,
 } from "@/generated/prisma/enums";
@@ -1139,6 +1140,119 @@ export async function getDebriefQueue(
     debriefNotes: p.debrief?.debriefNotes ?? null,
     contactStatus: (p.contactWorkflow?.contactStatus ?? "NOT_CONTACTED") as ContactStatus,
   }));
+
+  return { rows, total, page, pageSize };
+}
+
+export type InterviewRecordSummary = {
+  id: string;
+  interviewerName: string | null;
+  interviewMode: string | null;
+  status: string;
+  scheduledAt: string | null;
+  durationMinutes: number | null;
+  summary: string | null;
+  themes: string[];
+  researcherNotes: string | null;
+};
+
+export type InterviewQueueRow = {
+  participantId: string;
+  anonymousCode: string;
+  streamerName: string | null;
+  contactSubmittedAt: string;
+  invited: boolean;
+  invitedAt: string | null;
+  consent: InterviewConsentAnswer;
+  status: InterviewCandidateStatus;
+  preferredContactTime: string | null;
+  consentNotes: string | null;
+  latestInterview: InterviewRecordSummary | null;
+  eligible: boolean;
+  exclusionReason: string | null;
+  reviewNotes: string | null;
+};
+
+export type InterviewQueueFilters = {
+  q?: string;
+  status?: InterviewCandidateStatus;
+  page?: number;
+  pageSize?: number;
+};
+
+export async function getInterviewQueue(
+  filters: InterviewQueueFilters = {},
+): Promise<{ rows: InterviewQueueRow[]; total: number; page: number; pageSize: number }> {
+  const page = filters.page ?? 1;
+  const pageSize = filters.pageSize ?? 25;
+
+  const and: Prisma.ParticipantWhereInput[] = [{ contact: { isNot: null } }];
+  if (filters.q) {
+    and.push({
+      OR: [
+        { anonymousCode: { contains: filters.q, mode: "insensitive" } },
+        { streamer: { displayName: { contains: filters.q, mode: "insensitive" } } },
+      ],
+    });
+  }
+  if (filters.status) {
+    and.push(
+      filters.status === "NOT_INVITED"
+        ? { OR: [{ interviewConsent: null }, { interviewConsent: { status: "NOT_INVITED" } }] }
+        : { interviewConsent: { status: filters.status } },
+    );
+  }
+
+  const where: Prisma.ParticipantWhereInput = { AND: and };
+
+  const [total, participants] = await Promise.all([
+    prisma.participant.count({ where }),
+    prisma.participant.findMany({
+      where,
+      include: {
+        streamer: { select: { displayName: true } },
+        contact: { select: { createdAt: true } },
+        interviewConsent: true,
+        interviews: { orderBy: { createdAt: "desc" }, take: 1, include: { interviewer: { select: { name: true } } } },
+        researchEligibility: true,
+      },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+
+  const rows: InterviewQueueRow[] = participants.map((p) => {
+    const latest = p.interviews[0];
+    return {
+      participantId: p.id,
+      anonymousCode: p.anonymousCode,
+      streamerName: p.streamer?.displayName ?? null,
+      contactSubmittedAt: (p.contact?.createdAt ?? p.createdAt).toISOString(),
+      invited: p.interviewConsent?.invited ?? false,
+      invitedAt: p.interviewConsent?.invitedAt?.toISOString() ?? null,
+      consent: (p.interviewConsent?.consent ?? "PENDING") as InterviewConsentAnswer,
+      status: (p.interviewConsent?.status ?? "NOT_INVITED") as InterviewCandidateStatus,
+      preferredContactTime: p.interviewConsent?.preferredContactTime ?? null,
+      consentNotes: p.interviewConsent?.notes ?? null,
+      latestInterview: latest
+        ? {
+            id: latest.id,
+            interviewerName: latest.interviewer?.name ?? null,
+            interviewMode: latest.interviewMode as string | null,
+            status: latest.status as string,
+            scheduledAt: latest.scheduledAt?.toISOString() ?? null,
+            durationMinutes: latest.durationMinutes,
+            summary: latest.summary,
+            themes: latest.themes,
+            researcherNotes: latest.researcherNotes,
+          }
+        : null,
+      eligible: p.researchEligibility?.eligible ?? true,
+      exclusionReason: p.researchEligibility?.exclusionReason ?? null,
+      reviewNotes: p.researchEligibility?.reviewNotes ?? null,
+    };
+  });
 
   return { rows, total, page, pageSize };
 }

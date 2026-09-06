@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { slug: "contacts", label: "Contacts" },
   { slug: "debrief", label: "Debrief" },
+  { slug: "interviews", label: "Interviews" },
 ];
 
 export function OutreachTabs() {

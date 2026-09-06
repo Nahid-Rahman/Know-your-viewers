@@ -10,6 +10,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { requireRoleOrRedirect } from "@/lib/auth";
 import { getParticipantDetail, RECRUITMENT_SOURCE_LABELS } from "@/lib/queries/research";
+import { EligibilityForm } from "@/features/outreach/eligibility-form";
 
 export const metadata = { title: "Participant | LiveDrop Arena" };
 
@@ -329,37 +330,43 @@ export default async function ParticipantDetailPage({
 
         {/* Research Decision */}
         <TabsContent value="decision">
-          <div className="rounded-xl border border-border bg-card p-5">
-            <dl className="grid gap-3 text-sm sm:grid-cols-2">
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Data use permission</dt>
-                <dd>
-                  <StatusBadge
-                    status={
-                      p.dataUsePermission === "yes" ? "GRANTED" : p.dataUsePermission === "no" ? "DECLINED" : p.dataUsePermission === "withdrawn" ? "WITHDRAWN" : "PENDING"
-                    }
-                  />
-                </dd>
-              </div>
-              <div className="flex justify-between"><dt className="text-muted-foreground">Eligible for analysis</dt><dd><StatusBadge status={p.eligibility.eligible ? "ELIGIBLE" : "EXCLUDED"} /></dd></div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl border border-border bg-card p-5">
+              <p className="mb-3 font-semibold">Data use permission</p>
+              <dl className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Permission</dt>
+                  <dd>
+                    <StatusBadge
+                      status={
+                        p.dataUsePermission === "yes" ? "GRANTED" : p.dataUsePermission === "no" ? "DECLINED" : p.dataUsePermission === "withdrawn" ? "WITHDRAWN" : "PENDING"
+                      }
+                    />
+                  </dd>
+                </div>
+                {p.consentNotes && (
+                  <div className="pt-2"><dt className="mb-1 text-muted-foreground">Permission notes</dt><dd>{p.consentNotes}</dd></div>
+                )}
+              </dl>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-5">
+              <p className="mb-3 font-semibold">Eligibility</p>
               {!p.eligibility.eligible && (
-                <>
-                  <div className="flex justify-between"><dt className="text-muted-foreground">Exclusion reason</dt><dd>{p.eligibility.exclusionReason ? p.eligibility.exclusionReason.replaceAll("_", " ").toLowerCase() : "—"}</dd></div>
+                <dl className="mb-3 space-y-2 text-sm">
                   <div className="flex justify-between"><dt className="text-muted-foreground">Excluded by</dt><dd>{p.eligibility.excludedByName ?? "—"}</dd></div>
                   <div className="flex justify-between"><dt className="text-muted-foreground">Excluded at</dt><dd>{fmt(p.eligibility.excludedAt)}</dd></div>
-                </>
+                </dl>
               )}
-              {p.eligibility.reviewNotes && (
-                <div className="sm:col-span-2"><dt className="mb-1 text-muted-foreground">Review notes</dt><dd>{p.eligibility.reviewNotes}</dd></div>
-              )}
-              {p.consentNotes && (
-                <div className="sm:col-span-2"><dt className="mb-1 text-muted-foreground">Permission notes</dt><dd>{p.consentNotes}</dd></div>
-              )}
-            </dl>
-            <p className="mt-4 text-xs text-muted-foreground">
-              Eligibility is never set automatically — manage it from Outreach &rarr; Interviews once the research
-              team makes a final decision.
-            </p>
+              <EligibilityForm
+                participantId={p.id}
+                eligible={p.eligibility.eligible}
+                exclusionReason={p.eligibility.exclusionReason}
+                reviewNotes={p.eligibility.reviewNotes}
+              />
+              <p className="mt-3 text-xs text-muted-foreground">
+                Never set automatically — always an explicit research-team decision. Also editable from Outreach &rarr; Interviews.
+              </p>
+            </div>
           </div>
         </TabsContent>
       </Tabs>
