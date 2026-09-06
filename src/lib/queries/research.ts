@@ -163,24 +163,288 @@ export async function getExperimentStreamerOptions(
   return assignments.map((a) => a.streamer);
 }
 
+// Counts DISTINCT participants who reached each stage at least once (not raw
+// event rows — a participant can fire PAGE_VIEW/CTA_CLICKED more than once),
+// so the funnel is monotonically non-increasing top to bottom.
 export async function getFunnel(experimentId: string): Promise<FunnelStage[]> {
-  const [landed, spun, opened, submitted, debriefed, granted] = await Promise.all([
-    prisma.engagementEvent.count({ where: { type: "PAGE_VIEW", participant: { experimentId } } }),
-    prisma.engagementEvent.count({ where: { type: "SPIN_CLICKED", participant: { experimentId } } }),
-    prisma.engagementEvent.count({ where: { type: "MODAL_OPENED", participant: { experimentId } } }),
+  const [
+    websiteVisit,
+    ctaClick,
+    studyStarted,
+    taskCompleted,
+    contactSubmitted,
+    studyCompleted,
+    debriefCompleted,
+    interviewAccepted,
+  ] = await Promise.all([
+    prisma.participant.count({ where: { experimentId, events: { some: { type: "PAGE_VIEW" } } } }),
+    prisma.participant.count({ where: { experimentId, events: { some: { type: "CTA_CLICKED" } } } }),
+    prisma.participant.count({ where: { experimentId, events: { some: { type: "SPIN_CLICKED" } } } }),
+    prisma.participant.count({ where: { experimentId, events: { some: { type: "MODAL_OPENED" } } } }),
     prisma.participant.count({ where: { experimentId, contact: { isNot: null } } }),
-    prisma.debrief.count({ where: { participant: { experimentId } } }),
-    prisma.debrief.count({ where: { participant: { experimentId }, permissionGiven: true } }),
+    prisma.participant.count({ where: { experimentId, events: { some: { type: "STUDY_COMPLETED" } } } }),
+    prisma.debrief.count({
+      where: { participant: { experimentId }, debriefStatus: { in: ["ACKNOWLEDGED", "DECLINED"] } },
+    }),
+    prisma.interviewConsent.count({
+      where: { participant: { experimentId }, status: { in: ["ACCEPTED", "SCHEDULED", "COMPLETED", "NO_SHOW"] } },
+    }),
   ]);
 
   return [
-    { stage: "Landed", count: landed },
-    { stage: "Spun", count: spun },
-    { stage: "Opened entry form", count: opened },
-    { stage: "Submitted contact", count: submitted },
-    { stage: "Reached debrief", count: debriefed },
-    { stage: "Granted permission", count: granted },
+    { stage: "Website Visit", count: websiteVisit },
+    { stage: "CTA Click", count: ctaClick },
+    { stage: "Study Started", count: studyStarted },
+    { stage: "Task Completed", count: taskCompleted },
+    { stage: "Contact Submitted", count: contactSubmitted },
+    { stage: "Study Completed", count: studyCompleted },
+    { stage: "Debrief Completed", count: debriefCompleted },
+    { stage: "Interview Accepted", count: interviewAccepted },
   ];
+}
+
+export type DashboardSummary = {
+  totalParticipants: number;
+  studyStarted: number;
+  studyCompleted: number;
+  completionRate: number;
+  dropped: number;
+  contactsSubmitted: number;
+  debriefPending: number;
+  debriefCompleted: number;
+  dataUseApproved: number;
+  interviewAccepted: number;
+  interviewCompleted: number;
+  eligibleForAnalysis: number;
+};
+
+/** Global, across every experiment this researcher owns — the spec's KPI cards aren't per-study. */
+export async function getDashboardSummary(researcherId: string): Promise<DashboardSummary> {
+  const where = { experiment: { researcherId } };
+
+  const [
+    totalParticipants,
+    studyStarted,
+    studyCompleted,
+    contactsSubmitted,
+    debriefCompleted,
+    dataUseApproved,
+    interviewAccepted,
+    interviewCompleted,
+    ineligibleCount,
+  ] = await Promise.all([
+    prisma.participant.count({ where }),
+    prisma.participant.count({ where: { ...where, events: { some: { type: "SPIN_CLICKED" } } } }),
+    prisma.participant.count({ where: { ...where, events: { some: { type: "STUDY_COMPLETED" } } } }),
+    prisma.participant.count({ where: { ...where, contact: { isNot: null } } }),
+    prisma.debrief.count({
+      where: { participant: where, debriefStatus: { in: ["ACKNOWLEDGED", "DECLINED"] } },
+    }),
+    prisma.consent.count({ where: { participant: where, consentGiven: true, withdrawn: false } }),
+    prisma.interviewConsent.count({
+      where: { participant: where, status: { in: ["ACCEPTED", "SCHEDULED", "COMPLETED", "NO_SHOW"] } },
+    }),
+    prisma.interviewConsent.count({ where: { participant: where, status: "COMPLETED" } }),
+    prisma.researchEligibility.count({ where: { participant: where, eligible: false } }),
+  ]);
+
+  return {
+    totalParticipants,
+    studyStarted,
+    studyCompleted,
+    completionRate: pct(studyCompleted, studyStarted),
+    dropped: Math.max(studyStarted - studyCompleted, 0),
+    contactsSubmitted,
+    debriefPending: Math.max(totalParticipants - debriefCompleted, 0),
+    debriefCompleted,
+    dataUseApproved,
+    interviewAccepted,
+    interviewCompleted,
+    eligibleForAnalysis: Math.max(totalParticipants - ineligibleCount, 0),
+  };
+}
+
+export type RecruitmentSourceRow = {
+  source: "STREAM_QR" | "STREAM_CHAT_LINK" | "STREAM_DESCRIPTION" | "DIRECT" | "OTHER";
+  visits: number;
+  studyStarts: number;
+  completions: number;
+  completionRate: number;
+};
+
+export const RECRUITMENT_SOURCE_LABELS: Record<RecruitmentSourceRow["source"], string> = {
+  STREAM_QR: "QR Code",
+  STREAM_CHAT_LINK: "Chat Link",
+  STREAM_DESCRIPTION: "Stream Description",
+  DIRECT: "Direct",
+  OTHER: "Other",
+};
+
+export async function getRecruitmentSourceBreakdown(researcherId: string): Promise<RecruitmentSourceRow[]> {
+  const linkSources = ["STREAM_QR", "STREAM_CHAT_LINK", "STREAM_DESCRIPTION", "OTHER"] as const;
+
+  const rows = await Promise.all(
+    linkSources.map(async (source): Promise<RecruitmentSourceRow> => {
+      const where = { experiment: { researcherId }, trackingLink: { entrySource: source } };
+      const [visits, studyStarts, completions] = await Promise.all([
+        prisma.participant.count({ where }),
+        prisma.participant.count({ where: { ...where, events: { some: { type: "SPIN_CLICKED" } } } }),
+        prisma.participant.count({ where: { ...where, events: { some: { type: "STUDY_COMPLETED" } } } }),
+      ]);
+      return { source, visits, studyStarts, completions, completionRate: pct(completions, visits) };
+    }),
+  );
+
+  // A participant with no trackingLinkId arrived directly (no ?ref= at all).
+  const directWhere = { experiment: { researcherId }, trackingLinkId: null };
+  const [directVisits, directStarts, directCompletions] = await Promise.all([
+    prisma.participant.count({ where: directWhere }),
+    prisma.participant.count({ where: { ...directWhere, events: { some: { type: "SPIN_CLICKED" } } } }),
+    prisma.participant.count({ where: { ...directWhere, events: { some: { type: "STUDY_COMPLETED" } } } }),
+  ]);
+  rows.push({
+    source: "DIRECT",
+    visits: directVisits,
+    studyStarts: directStarts,
+    completions: directCompletions,
+    completionRate: pct(directCompletions, directVisits),
+  });
+
+  return rows.filter((r) => r.visits > 0);
+}
+
+export type StreamerPerformanceRow = {
+  streamerId: string;
+  displayName: string;
+  streamSessions: number;
+  participants: number;
+  completed: number;
+  completionRate: number;
+  interviewAccepted: number;
+};
+
+export async function getStreamerPerformance(researcherId: string): Promise<StreamerPerformanceRow[]> {
+  const streamers = await prisma.streamer.findMany({
+    where: { experiments: { some: { experiment: { researcherId } } } },
+    select: { id: true, displayName: true },
+  });
+
+  return Promise.all(
+    streamers.map(async (s): Promise<StreamerPerformanceRow> => {
+      const where = { experiment: { researcherId }, trackingLink: { streamerId: s.id } };
+      const [streamSessions, participants, completed, interviewAccepted] = await Promise.all([
+        prisma.streamSession.count({ where: { streamerId: s.id, experiment: { researcherId } } }),
+        prisma.participant.count({ where }),
+        prisma.participant.count({ where: { ...where, events: { some: { type: "STUDY_COMPLETED" } } } }),
+        prisma.interviewConsent.count({
+          where: { participant: where, status: { in: ["ACCEPTED", "SCHEDULED", "COMPLETED", "NO_SHOW"] } },
+        }),
+      ]);
+      return {
+        streamerId: s.id,
+        displayName: s.displayName,
+        streamSessions,
+        participants,
+        completed,
+        completionRate: pct(completed, participants),
+        interviewAccepted,
+      };
+    }),
+  );
+}
+
+export type RecentActivityItem = {
+  id: string;
+  label: string;
+  anonymousCode: string;
+  timestamp: string;
+};
+
+/** Merges a handful of "something happened" signals into one recency-sorted feed. */
+export async function getRecentActivity(researcherId: string, limit = 10): Promise<RecentActivityItem[]> {
+  const where = { experiment: { researcherId } };
+  const participantSelect = { participant: { select: { anonymousCode: true } } };
+
+  const [completedEvents, contactEvents, debriefs, consents, interviewAccepts, interviewCompletes] =
+    await Promise.all([
+      prisma.engagementEvent.findMany({
+        where: { type: "STUDY_COMPLETED", participant: where },
+        include: participantSelect,
+        orderBy: { timestamp: "desc" },
+        take: limit,
+      }),
+      prisma.engagementEvent.findMany({
+        where: { type: "CONTACT_SUBMITTED", participant: where },
+        include: participantSelect,
+        orderBy: { timestamp: "desc" },
+        take: limit,
+      }),
+      prisma.debrief.findMany({
+        where: { participant: where, debriefStatus: { in: ["ACKNOWLEDGED", "DECLINED"] } },
+        include: participantSelect,
+        orderBy: { timestamp: "desc" },
+        take: limit,
+      }),
+      prisma.consent.findMany({
+        where: { participant: where, consentGiven: true, withdrawn: false },
+        include: participantSelect,
+        orderBy: { timestamp: "desc" },
+        take: limit,
+      }),
+      prisma.interviewConsent.findMany({
+        where: { participant: where, status: "ACCEPTED" },
+        include: participantSelect,
+        orderBy: { updatedAt: "desc" },
+        take: limit,
+      }),
+      prisma.interviewConsent.findMany({
+        where: { participant: where, status: "COMPLETED" },
+        include: participantSelect,
+        orderBy: { updatedAt: "desc" },
+        take: limit,
+      }),
+    ]);
+
+  const items: RecentActivityItem[] = [
+    ...completedEvents.map((e) => ({
+      id: `study-${e.id}`,
+      label: "Participant completed study",
+      anonymousCode: e.participant.anonymousCode,
+      timestamp: e.timestamp.toISOString(),
+    })),
+    ...contactEvents.map((e) => ({
+      id: `contact-${e.id}`,
+      label: "New contact submitted",
+      anonymousCode: e.participant.anonymousCode,
+      timestamp: e.timestamp.toISOString(),
+    })),
+    ...debriefs.map((d) => ({
+      id: `debrief-${d.id}`,
+      label: "Debrief completed",
+      anonymousCode: d.participant.anonymousCode,
+      timestamp: d.timestamp.toISOString(),
+    })),
+    ...consents.map((c) => ({
+      id: `consent-${c.id}`,
+      label: "Data-use permission received",
+      anonymousCode: c.participant.anonymousCode,
+      timestamp: c.timestamp.toISOString(),
+    })),
+    ...interviewAccepts.map((i) => ({
+      id: `interview-accept-${i.id}`,
+      label: "Interview accepted",
+      anonymousCode: i.participant.anonymousCode,
+      timestamp: (i.consentAt ?? i.updatedAt).toISOString(),
+    })),
+    ...interviewCompletes.map((i) => ({
+      id: `interview-complete-${i.id}`,
+      label: "Interview completed",
+      anonymousCode: i.participant.anonymousCode,
+      timestamp: i.updatedAt.toISOString(),
+    })),
+  ];
+
+  return items.sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, limit);
 }
 
 export const getSiteContent = cache(async (): Promise<SiteContentValues | null> => {
