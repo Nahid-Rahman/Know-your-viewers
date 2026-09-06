@@ -34,6 +34,19 @@ function toDateOnly(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * Canonical shape is `{ [questionId]: answer }` (see the Response model comment), but some
+ * historical seeded rows were written with `q<order>` shorthand keys instead of real question
+ * UUIDs — fall back to that so those rows aren't silently dropped from responses/exports.
+ */
+function resolveAnswer(
+  answers: Record<string, string | number>,
+  question: { id: string; order: number },
+): string | number | undefined {
+  if (answers[question.id] !== undefined) return answers[question.id];
+  return answers[`q${question.order}`];
+}
+
 async function toConditionDTO(condition: Condition): Promise<ConditionDTO> {
   const [participantCount, disclosedCount] = await Promise.all([
     prisma.participant.count({ where: { conditionId: condition.id } }),
@@ -858,12 +871,13 @@ export async function getParticipantDetail(participantId: string) {
     return r.survey.questions
       .slice()
       .sort((a, b) => a.order - b.order)
-      .filter((q) => answers[q.id] !== undefined)
-      .map((q) => ({
+      .map((q) => ({ q, answer: resolveAnswer(answers, q) }))
+      .filter((entry): entry is { q: (typeof r.survey.questions)[number]; answer: string | number } => entry.answer !== undefined)
+      .map(({ q, answer }) => ({
         surveyTitle: r.survey.title,
         questionOrder: q.order,
         questionText: q.questionText,
-        answer: answers[q.id],
+        answer,
       }));
   });
 
@@ -1255,4 +1269,156 @@ export async function getInterviewQueue(
   });
 
   return { rows, total, page, pageSize };
+}
+
+export type ResearchDatasetSummary = {
+  totalParticipants: number;
+  totalEvents: number;
+  totalResponses: number;
+  contactsOnFile: number;
+  interviewsCompleted: number;
+  excludedCount: number;
+};
+
+export async function getResearchDatasetSummary(): Promise<ResearchDatasetSummary> {
+  const [totalParticipants, totalEvents, totalResponses, contactsOnFile, interviewsCompleted, excludedCount] =
+    await Promise.all([
+      prisma.participant.count(),
+      prisma.engagementEvent.count(),
+      prisma.response.count(),
+      prisma.participantContact.count(),
+      prisma.interview.count({ where: { status: "COMPLETED" } }),
+      prisma.researchEligibility.count({ where: { eligible: false } }),
+    ]);
+  return { totalParticipants, totalEvents, totalResponses, contactsOnFile, interviewsCompleted, excludedCount };
+}
+
+/** Main behavioral research dataset — never includes contact info, per the no-phone-in-the-default-export rule. */
+export async function getBehavioralDatasetRows() {
+  const participants = await prisma.participant.findMany({
+    include: {
+      experiment: { select: { title: true } },
+      condition: { select: { name: true } },
+      streamer: { select: { displayName: true } },
+      trackingLink: { select: { entrySource: true } },
+      contact: { select: { id: true } },
+      debrief: { select: { debriefStatus: true } },
+      consent: { select: { consentGiven: true, withdrawn: true } },
+      interviewConsent: { select: { status: true } },
+      researchEligibility: { select: { eligible: true } },
+      events: { select: { type: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  return participants.map((p) => {
+    const eventTypes = new Set(p.events.map((e) => e.type));
+    const { currentStage, studyStatus } = deriveFunnel({
+      eventTypes,
+      hasContact: Boolean(p.contact),
+      debriefStatus: p.debrief?.debriefStatus ?? null,
+      interviewStatus: p.interviewConsent?.status ?? null,
+    });
+    return {
+      participantId: p.anonymousCode,
+      experimentTitle: p.experiment.title,
+      conditionName: p.condition?.name ?? "",
+      streamerName: p.streamer?.displayName ?? "",
+      entrySource: p.trackingLink?.entrySource ?? "DIRECT",
+      firstVisit: p.createdAt.toISOString(),
+      currentStage,
+      studyStatus,
+      rewardLabel: p.rewardLabel ?? "",
+      rewardRarity: p.rewardRarity ?? "",
+      dataUsePermission: deriveDataUsePermission(p.consent),
+      debriefStatus: p.debrief?.debriefStatus ?? "PENDING",
+      interviewStatus: p.interviewConsent?.status ?? "NOT_INVITED",
+      eligible: p.researchEligibility?.eligible ?? true,
+    };
+  });
+}
+
+export async function getSurveyResponseExportRows() {
+  const responses = await prisma.response.findMany({
+    include: {
+      participant: { select: { anonymousCode: true } },
+      survey: { select: { title: true, questions: { select: { id: true, order: true, questionText: true } } } },
+    },
+    orderBy: { submittedAt: "asc" },
+  });
+
+  return responses.flatMap((r) => {
+    const answers = r.answers as Record<string, string | number>;
+    return r.survey.questions
+      .slice()
+      .sort((a, b) => a.order - b.order)
+      .map((q) => ({ q, answer: resolveAnswer(answers, q) }))
+      .filter((entry): entry is { q: (typeof r.survey.questions)[number]; answer: string | number } => entry.answer !== undefined)
+      .map(({ q, answer }) => ({
+        participantId: r.participant.anonymousCode,
+        surveyTitle: r.survey.title,
+        questionOrder: q.order,
+        questionText: q.questionText,
+        answer,
+        submittedAt: r.submittedAt.toISOString(),
+      }));
+  });
+}
+
+export async function getEventExportRows() {
+  const events = await prisma.engagementEvent.findMany({
+    include: { participant: { select: { anonymousCode: true } } },
+    orderBy: { timestamp: "asc" },
+  });
+  return events.map((e) => ({
+    participantId: e.participant.anonymousCode,
+    type: e.type,
+    page: e.page ?? "",
+    element: e.element ?? "",
+    eventValue: e.eventValue ?? "",
+    timestamp: e.timestamp.toISOString(),
+  }));
+}
+
+export async function getInterviewStatusExportRows() {
+  const participants = await prisma.participant.findMany({
+    where: { interviewConsent: { isNot: null } },
+    include: {
+      interviewConsent: true,
+      interviews: { orderBy: { createdAt: "desc" }, take: 1 },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  return participants.map((p) => {
+    const latest = p.interviews[0];
+    return {
+      participantId: p.anonymousCode,
+      invited: p.interviewConsent?.invited ?? false,
+      consent: p.interviewConsent?.consent ?? "PENDING",
+      status: p.interviewConsent?.status ?? "NOT_INVITED",
+      interviewMode: latest?.interviewMode ?? "",
+      scheduledAt: latest?.scheduledAt?.toISOString() ?? "",
+      durationMinutes: latest?.durationMinutes ?? "",
+      themes: latest?.themes ?? [],
+      summary: latest?.summary ?? "",
+    };
+  });
+}
+
+/**
+ * Row data (still encrypted) for the restricted contact export — the only one of the 5
+ * export types that ever includes contact info. Decryption itself happens in the Route
+ * Handler, not here, so this reusable query module never becomes a place a future page
+ * render could accidentally decrypt contact values from.
+ */
+export async function getContactExportSourceRows() {
+  return prisma.participant.findMany({
+    where: { contact: { isNot: null } },
+    include: {
+      contact: true,
+      streamer: { select: { displayName: true } },
+      contactWorkflow: true,
+    },
+    orderBy: { createdAt: "asc" },
+  });
 }
