@@ -151,6 +151,18 @@ export async function getTrackingLinks(experimentId: string): Promise<TrackingLi
   );
 }
 
+/** Streamers assigned to an experiment, for the participant-facing "which streamer are you watching" select. */
+export async function getExperimentStreamerOptions(
+  experimentId: string,
+): Promise<{ id: string; displayName: string }[]> {
+  const assignments = await prisma.experimentStreamer.findMany({
+    where: { experimentId },
+    include: { streamer: { select: { id: true, displayName: true } } },
+    orderBy: { assignedAt: "asc" },
+  });
+  return assignments.map((a) => a.streamer);
+}
+
 export async function getFunnel(experimentId: string): Promise<FunnelStage[]> {
   const [landed, spun, opened, submitted, debriefed, granted] = await Promise.all([
     prisma.engagementEvent.count({ where: { type: "PAGE_VIEW", participant: { experimentId } } }),
@@ -211,6 +223,7 @@ export async function getSurveysForExperiment(experimentId: string) {
 export type ParticipantRow = {
   anonymousCode: string;
   conditionName: string;
+  streamerName: string | null;
   consentStatus: "PENDING" | "GRANTED" | "DECLINED";
   spun: boolean;
   submittedContact: boolean;
@@ -224,6 +237,7 @@ export async function getParticipantRows(experimentId: string): Promise<Particip
     where: { experimentId },
     include: {
       condition: { select: { name: true } },
+      streamer: { select: { displayName: true } },
       contact: { select: { id: true } },
       debrief: { select: { permissionGiven: true } },
       events: { where: { type: "SPIN_CLICKED" }, select: { id: true }, take: 1 },
@@ -234,6 +248,7 @@ export async function getParticipantRows(experimentId: string): Promise<Particip
   return participants.map((p) => ({
     anonymousCode: p.anonymousCode,
     conditionName: p.condition?.name ?? "Unassigned",
+    streamerName: p.streamer?.displayName ?? null,
     consentStatus: p.consentStatus,
     spun: p.events.length > 0,
     submittedContact: Boolean(p.contact),

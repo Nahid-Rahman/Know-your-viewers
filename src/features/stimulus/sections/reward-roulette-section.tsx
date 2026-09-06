@@ -48,11 +48,15 @@ export function RewardRouletteSection({
   rewardPool,
   gameTypeOptions,
   watchFrequencyOptions,
+  streamerOptions,
+  defaultStreamerId,
 }: {
   config: StimulusRuntimeConfig;
   rewardPool: RewardPoolItem[];
   gameTypeOptions: string[];
   watchFrequencyOptions: string[];
+  streamerOptions: { id: string; displayName: string }[];
+  defaultStreamerId: string | null;
 }) {
   const poolSize = rewardPool.length;
   const loopWidth = poolSize * PITCH;
@@ -276,6 +280,8 @@ export function RewardRouletteSection({
         contactRequirement={config.contactRequirement}
         gameTypeOptions={gameTypeOptions}
         watchFrequencyOptions={watchFrequencyOptions}
+        streamerOptions={streamerOptions}
+        defaultStreamerId={defaultStreamerId}
       />
     </section>
   );

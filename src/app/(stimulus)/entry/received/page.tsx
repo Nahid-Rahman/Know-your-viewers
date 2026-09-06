@@ -9,6 +9,7 @@ import {
   Gamepad2,
   Zap as ZapIcon,
   Image as ImageIcon,
+  Radio,
   ArrowRight,
   Headphones,
 } from "lucide-react";
@@ -25,6 +26,7 @@ const DETAIL_ICONS = {
   email: Mail,
   phone: Mail,
   contact: Mail,
+  streamer: Radio,
   streamNickname: ImageIcon,
   favouriteGameType: Gamepad2,
   livestreamFrequency: ZapIcon,
@@ -71,6 +73,7 @@ export default function SubmissionReceivedPage() {
           ...(entry.phone ? [{ key: "phone" as const, label: "Phone", value: entry.phone }] : []),
         ]
       : [{ key: "contact" as const, label: "Email or Phone", value: "-" }]),
+    { key: "streamer", label: "Streamer", value: entry.streamerName || "-" },
     { key: "streamNickname", label: "Stream Nickname", value: entry.streamNickname || "-" },
     { key: "favouriteGameType", label: "Favourite Game Type", value: entry.favouriteGameType || "-" },
     { key: "livestreamFrequency", label: "Livestream Frequency", value: entry.livestreamFrequency || "-" },

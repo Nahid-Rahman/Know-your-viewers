@@ -17,6 +17,7 @@ export type MockEntry = {
   streamNickname: string;
   favouriteGameType: string;
   livestreamFrequency: string;
+  streamerName: string;
   submittedAt: string;
 };
 

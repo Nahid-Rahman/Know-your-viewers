@@ -1,4 +1,4 @@
-import { randomBytes, createCipheriv, createDecipheriv } from "node:crypto";
+import { randomBytes, createCipheriv, createDecipheriv, createHmac } from "node:crypto";
 
 const ALGORITHM = "aes-256-gcm";
 
@@ -24,6 +24,20 @@ export function encryptContact(plaintext: string): string {
   const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
   const authTag = cipher.getAuthTag();
   return [iv, authTag, ciphertext].map((b) => b.toString("base64")).join(".");
+}
+
+/**
+ * Deterministic HMAC of a normalized (trimmed, lowercased) email — lets
+ * submitEntry look up "has this email already submitted for this streamer"
+ * without ever decrypting the actual contact value. Reuses the encryption
+ * key as the HMAC secret since it's already the one contact-related secret
+ * this app manages; a different primitive (HMAC vs AES-GCM) means no key
+ * reuse issue between the two.
+ */
+export function hashEmail(email: string): string {
+  const key = getKey();
+  const normalized = email.trim().toLowerCase();
+  return createHmac("sha256", key).update(normalized).digest("hex");
 }
 
 /** Decrypts a stored contact value. Only ever call this from an explicit, audited researcher action — never for display in a list view. */

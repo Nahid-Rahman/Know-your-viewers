@@ -45,6 +45,7 @@ export default async function ParticipantsPage({
               <TableRow>
                 <TableHead>Anonymous Code</TableHead>
                 <TableHead>Condition</TableHead>
+                <TableHead>Streamer</TableHead>
                 <TableHead>Consent</TableHead>
                 <TableHead className="text-center">Spun</TableHead>
                 <TableHead className="text-center">Submitted Contact</TableHead>
@@ -57,6 +58,7 @@ export default async function ParticipantsPage({
                 <TableRow key={r.anonymousCode}>
                   <TableCell className="font-mono text-xs">{r.anonymousCode}</TableCell>
                   <TableCell className="text-sm">{r.conditionName}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{r.streamerName ?? "—"}</TableCell>
                   <TableCell className="text-sm">{r.consentStatus.toLowerCase()}</TableCell>
                   <TableCell className="text-center"><Tick value={r.spun} /></TableCell>
                   <TableCell className="text-center"><Tick value={r.submittedContact} /></TableCell>

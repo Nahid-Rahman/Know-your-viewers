@@ -20,13 +20,16 @@ import { saveMockEntry } from "@/features/stimulus/mock-entry-store";
 import { logEngagementEvent, submitEntry } from "@/lib/actions/participant";
 import type { ContactRequirement } from "@/generated/prisma/enums";
 
-function buildEntrySchema(contactRequired: boolean) {
+function buildEntrySchema(contactRequired: boolean, streamerRequired: boolean) {
   const base = z.object({
     email: z.string().optional(),
     phone: z.string().optional(),
     streamNickname: z.string().optional(),
     favouriteGameType: z.string().optional(),
     livestreamFrequency: z.string().optional(),
+    streamerId: streamerRequired
+      ? z.string().min(1, "Select which streamer's stream you're watching.")
+      : z.string().optional(),
   });
   if (!contactRequired) return base;
   // Both are required (not either/or) — some reward types (e.g. bKash) can
@@ -51,6 +54,8 @@ export function RewardClaimModal({
   contactRequirement,
   gameTypeOptions,
   watchFrequencyOptions,
+  streamerOptions,
+  defaultStreamerId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -58,19 +63,25 @@ export function RewardClaimModal({
   contactRequirement: ContactRequirement;
   gameTypeOptions: string[];
   watchFrequencyOptions: string[];
+  streamerOptions: { id: string; displayName: string }[];
+  defaultStreamerId: string | null;
 }) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const contactRequired = contactRequirement === "REQUIRED";
+  const streamerRequired = streamerOptions.length > 0;
+  const defaultStreamerValue =
+    defaultStreamerId && streamerOptions.some((s) => s.id === defaultStreamerId) ? defaultStreamerId : "";
 
   const form = useForm<EntryValues>({
-    resolver: zodResolver(buildEntrySchema(contactRequired)),
+    resolver: zodResolver(buildEntrySchema(contactRequired, streamerRequired)),
     defaultValues: {
       email: "",
       phone: "",
       streamNickname: "",
       favouriteGameType: "",
       livestreamFrequency: "",
+      streamerId: defaultStreamerValue,
     },
   });
 
@@ -102,6 +113,7 @@ export function RewardClaimModal({
       streamNickname: values.streamNickname?.trim() ?? "",
       favouriteGameType: values.favouriteGameType ?? "",
       livestreamFrequency: values.livestreamFrequency ?? "",
+      streamerName: streamerOptions.find((s) => s.id === values.streamerId)?.displayName ?? "",
       submittedAt: new Date().toISOString(),
     });
     onOpenChange(false);
@@ -186,6 +198,25 @@ export function RewardClaimModal({
               )}
             </div>
           </div>
+
+          {streamerRequired && (
+            <div>
+              <LightFieldLabel htmlFor="entry-streamer">Which streamer&apos;s stream are you watching?</LightFieldLabel>
+              <LightSelect id="entry-streamer" {...form.register("streamerId")} defaultValue={defaultStreamerValue}>
+                <option value="" disabled>
+                  Select an option
+                </option>
+                {streamerOptions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.displayName}
+                  </option>
+                ))}
+              </LightSelect>
+              {form.formState.errors.streamerId && (
+                <p className="mt-1 text-xs text-destructive">{form.formState.errors.streamerId.message}</p>
+              )}
+            </div>
+          )}
 
           <div>
             <LightFieldLabel htmlFor="entry-nickname">Stream Nickname</LightFieldLabel>

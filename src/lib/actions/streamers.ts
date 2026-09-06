@@ -120,9 +120,11 @@ export async function deleteStreamer(streamerId: string): Promise<{ error: strin
   const streamer = await prisma.streamer.findUnique({ where: { id: streamerId }, include: { user: true } });
   if (!streamer) return { error: "Streamer not found." };
 
-  // TrackingLink.streamerId has no cascade rule — unassign first so the
-  // cascade from deleting the User (below) doesn't hit a FK violation.
+  // TrackingLink.streamerId and Participant.streamerId have no cascade rule
+  // — unassign both first so the cascade from deleting the User (below)
+  // doesn't hit a FK violation.
   await prisma.trackingLink.updateMany({ where: { streamerId }, data: { streamerId: null } });
+  await prisma.participant.updateMany({ where: { streamerId }, data: { streamerId: null } });
   await prisma.user.delete({ where: { id: streamer.userId } });
 
   if (process.env.SUPABASE_SERVICE_ROLE_KEY) {

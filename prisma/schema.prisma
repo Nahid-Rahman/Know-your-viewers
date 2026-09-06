@@ -147,6 +147,9 @@ model Streamer {
   user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   experiments   ExperimentStreamer[]
   trackingLinks TrackingLink[]
+  // Self-reported "which streamer are you watching" on Participant, not the
+  // tracking-link click-through relation above.
+  viewers       Participant[]
 
   @@map("streamers")
 }
@@ -169,6 +172,12 @@ model Participant {
   // counts for a TrackingLink are derived from this relation rather than
   // kept in a separate counter table.
   trackingLinkId String?
+  // Self-reported at entry-submission time (which streamer's stream they're
+  // watching) — distinct from trackingLinkId, since a participant can visit
+  // via one streamer's link but actually be watching another, or arrive with
+  // no link at all. This is the field the per-streamer contact-dedup check
+  // (see submitEntry) is scoped by.
+  streamerId     String?
   anonymousCode  String        @unique
   consentStatus  ConsentStatus @default(PENDING)
   // Which reward the roulette showed/awarded this participant at claim time.
@@ -179,6 +188,7 @@ model Participant {
   experiment   Experiment    @relation(fields: [experimentId], references: [id], onDelete: Cascade)
   condition    Condition?    @relation(fields: [conditionId], references: [id])
   trackingLink TrackingLink? @relation(fields: [trackingLinkId], references: [id])
+  streamer     Streamer?     @relation(fields: [streamerId], references: [id])
 
   // Contact details live in a separate, independently-deletable table —
   // never joined into analytics queries.
@@ -192,6 +202,7 @@ model Participant {
   @@index([experimentId])
   @@index([conditionId])
   @@index([trackingLinkId])
+  @@index([streamerId])
   @@map("participants")
 }
 
@@ -208,6 +219,10 @@ model ParticipantContact {
   // by phone, so email alone isn't always enough for follow-up.
   encryptedValue  String
   encryptedPhone  String?
+  // Deterministic HMAC of the normalized email (see src/lib/crypto.ts) —
+  // never the plaintext, but lets submitEntry look up "has this email
+  // already submitted for this streamer" without decrypting anything.
+  emailHash       String?
   streamNickname  String?
   favouriteGameType String?
   livestreamFrequency String?
@@ -215,6 +230,7 @@ model ParticipantContact {
 
   participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
 
+  @@index([emailHash])
   @@map("participant_contacts")
 }
 

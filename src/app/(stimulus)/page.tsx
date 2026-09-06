@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { PARTICIPANT_COOKIE, toRuntimeConfig } from "@/lib/participant";
-import { getSiteContent } from "@/lib/queries/research";
+import { getSiteContent, getExperimentStreamerOptions } from "@/lib/queries/research";
 import type { Rarity } from "@/components/common/rarity-badge";
 import { HeroSection } from "@/features/stimulus/sections/hero-section";
 import { TrustBadgesSection } from "@/features/stimulus/sections/trust-badges-section";
@@ -36,13 +36,14 @@ export default async function LandingPage({ searchParams }: PageProps<"/">) {
 
   const participant = await prisma.participant.findUnique({
     where: { id: participantId },
-    include: { condition: true },
+    include: { condition: true, trackingLink: true },
   });
   if (!participant) redirect(bootstrapUrl);
 
   await prisma.engagementEvent.create({ data: { participantId: participant.id, type: "PAGE_VIEW" } });
   const config = toRuntimeConfig(participant.condition);
   const content = (await getSiteContent()) ?? FALLBACK_CONTENT;
+  const streamerOptions = await getExperimentStreamerOptions(participant.experimentId);
 
   return (
     <>
@@ -54,6 +55,8 @@ export default async function LandingPage({ searchParams }: PageProps<"/">) {
         rewardPool={content.rewardPool as { label: string; sub: string; rarity: Rarity }[]}
         gameTypeOptions={content.gameTypeOptions}
         watchFrequencyOptions={content.watchFrequencyOptions}
+        streamerOptions={streamerOptions}
+        defaultStreamerId={participant.trackingLink?.streamerId ?? null}
       />
       <HowItWorksSection />
       <FaqSection faqItems={content.faqItems} />

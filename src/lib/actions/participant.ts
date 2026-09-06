@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { encryptContact } from "@/lib/crypto";
+import { encryptContact, hashEmail } from "@/lib/crypto";
 import { PARTICIPANT_COOKIE } from "@/lib/participant";
 import type { EngagementEventType, Rarity } from "@/generated/prisma/enums";
 
@@ -25,6 +25,7 @@ const entrySchema = z.object({
   streamNickname: z.string().optional(),
   favouriteGameType: z.string().optional(),
   livestreamFrequency: z.string().optional(),
+  streamerId: z.string().optional(),
   rewardLabel: z.string(),
   rewardRarity: z.enum(["common", "rare", "exceptional", "premium"]),
 });
@@ -48,8 +49,16 @@ export async function submitEntry(
   });
   if (!participant) return { error: "Your session expired — please reload the page and spin again." };
 
-  const { email, phone, streamNickname, favouriteGameType, livestreamFrequency, rewardLabel, rewardRarity } =
-    parsed.data;
+  const {
+    email,
+    phone,
+    streamNickname,
+    favouriteGameType,
+    livestreamFrequency,
+    streamerId,
+    rewardLabel,
+    rewardRarity,
+  } = parsed.data;
   const emailValue = email?.trim() || "";
   const phoneValue = phone?.trim() || "";
 
@@ -60,10 +69,38 @@ export async function submitEntry(
     return { error: "This entry requires both an email and a phone number." };
   }
 
+  // Self-reported "which streamer are you watching" — validated against the
+  // experiment's assigned streamers rather than trusted as-is, since it's
+  // also what the per-streamer contact-dedup check below is scoped by.
+  let resolvedStreamerId: string | null = null;
+  if (streamerId) {
+    const assignment = await prisma.experimentStreamer.findFirst({
+      where: { experimentId: participant.experimentId, streamerId },
+    });
+    if (!assignment) return { error: "Invalid streamer selection — please reload and try again." };
+    resolvedStreamerId = streamerId;
+  }
+
+  // Same email may enter once per streamer, not once platform-wide — e.g. a
+  // viewer who watches two different streamers should be able to submit for
+  // both. Scoped by the self-reported streamer above, not the tracking link.
+  if (emailValue) {
+    const emailHash = hashEmail(emailValue);
+    const duplicate = await prisma.participantContact.findFirst({
+      where: {
+        emailHash,
+        participant: { id: { not: participant.id }, streamerId: resolvedStreamerId },
+      },
+    });
+    if (duplicate) {
+      return { error: "This email has already submitted an entry for this streamer." };
+    }
+  }
+
   await prisma.$transaction([
     prisma.participant.update({
       where: { id: participant.id },
-      data: { rewardLabel, rewardRarity: rewardRarity.toUpperCase() as Rarity },
+      data: { rewardLabel, rewardRarity: rewardRarity.toUpperCase() as Rarity, streamerId: resolvedStreamerId },
     }),
     ...(emailValue || phoneValue
       ? [
@@ -72,6 +109,7 @@ export async function submitEntry(
             update: {
               encryptedValue: encryptContact(emailValue || phoneValue),
               encryptedPhone: phoneValue ? encryptContact(phoneValue) : null,
+              emailHash: emailValue ? hashEmail(emailValue) : null,
               streamNickname: streamNickname || null,
               favouriteGameType: favouriteGameType || null,
               livestreamFrequency: livestreamFrequency || null,
@@ -80,6 +118,7 @@ export async function submitEntry(
               participantId: participant.id,
               encryptedValue: encryptContact(emailValue || phoneValue),
               encryptedPhone: phoneValue ? encryptContact(phoneValue) : null,
+              emailHash: emailValue ? hashEmail(emailValue) : null,
               streamNickname: streamNickname || null,
               favouriteGameType: favouriteGameType || null,
               livestreamFrequency: livestreamFrequency || null,
