@@ -38,6 +38,25 @@ const STATUS_CLASSES: Record<string, string> = {
   EXCLUDED: "bg-destructive/10 text-destructive border-destructive/30",
   WITHDRAWN: "bg-destructive/10 text-destructive border-destructive/30",
 
+  // Prize fulfillment
+  SELECTED: "bg-secondary text-muted-foreground border-border",
+  WON: "bg-accent-violet/10 text-accent-violet border-accent-violet/30",
+  CLAIMED: "bg-accent-cyan/10 text-accent-cyan border-accent-cyan/30",
+  NOT_CLAIMED: "bg-destructive/10 text-destructive border-destructive/30",
+  DELIVERED: "bg-accent-green/10 text-accent-green border-accent-green/30",
+
+  // Contact attempt outcome
+  ANSWERED: "bg-accent-green/10 text-accent-green border-accent-green/30",
+  NO_ANSWER: "bg-secondary text-muted-foreground border-border",
+  WRONG_NUMBER: "bg-destructive/10 text-destructive border-destructive/30",
+  CALL_BACK_LATER: "bg-accent-violet/10 text-accent-violet border-accent-violet/30",
+  DEBRIEF_COMPLETED: "bg-accent-cyan/10 text-accent-cyan border-accent-cyan/30",
+
+  // Debrief method
+  PHONE_CALL: "bg-accent-violet/10 text-accent-violet border-accent-violet/30",
+  WHATSAPP: "bg-accent-green/10 text-accent-green border-accent-green/30",
+  SMS: "bg-accent-cyan/10 text-accent-cyan border-accent-cyan/30",
+
   // Recruitment entry source
   STREAM_QR: "bg-accent-cyan/10 text-accent-cyan border-accent-cyan/30",
   STREAM_CHAT_LINK: "bg-accent-violet/10 text-accent-violet border-accent-violet/30",

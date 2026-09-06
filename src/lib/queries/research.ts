@@ -14,7 +14,12 @@ import type {
   StreamerModel as Streamer,
 } from "@/generated/prisma/models";
 import type { Prisma } from "@/generated/prisma/client";
-import type { DebriefStatus, InterviewCandidateStatus } from "@/generated/prisma/enums";
+import type {
+  DebriefStatus,
+  InterviewCandidateStatus,
+  ContactStatus,
+  PrizeFulfillmentStatus,
+} from "@/generated/prisma/enums";
 import type { EntrySourceValue } from "@/lib/entry-source";
 import { DEFAULT_SITE_CONTENT, type SiteContentValues } from "@/lib/site-content-defaults";
 
@@ -962,3 +967,178 @@ export async function getParticipantDetail(participantId: string) {
 }
 
 export type ParticipantDetail = NonNullable<Awaited<ReturnType<typeof getParticipantDetail>>>;
+
+export async function getResearchers(): Promise<{ id: string; name: string }[]> {
+  return prisma.user.findMany({ where: { role: "RESEARCHER" }, select: { id: true, name: true }, orderBy: { name: "asc" } });
+}
+
+export type ContactQueueRow = {
+  participantId: string;
+  anonymousCode: string;
+  streamerName: string | null;
+  rewardLabel: string | null;
+  rewardRarity: string | null;
+  contactSubmittedAt: string;
+  contactStatus: ContactStatus;
+  researcherAssignedId: string | null;
+  researcherAssignedName: string | null;
+  nextFollowupAt: string | null;
+  prizeFulfillmentStatus: PrizeFulfillmentStatus | null;
+  contactNotes: string | null;
+  attemptCount: number;
+  lastAttemptAt: string | null;
+};
+
+export type ContactQueueFilters = {
+  q?: string;
+  contactStatus?: ContactStatus;
+  researcherAssignedId?: string;
+  overdueFollowup?: boolean;
+  page?: number;
+  pageSize?: number;
+};
+
+export async function getContactQueue(
+  filters: ContactQueueFilters = {},
+): Promise<{ rows: ContactQueueRow[]; total: number; page: number; pageSize: number }> {
+  const page = filters.page ?? 1;
+  const pageSize = filters.pageSize ?? 25;
+
+  const and: Prisma.ParticipantWhereInput[] = [{ contact: { isNot: null } }];
+  if (filters.q) {
+    and.push({
+      OR: [
+        { anonymousCode: { contains: filters.q, mode: "insensitive" } },
+        { streamer: { displayName: { contains: filters.q, mode: "insensitive" } } },
+      ],
+    });
+  }
+  if (filters.contactStatus) {
+    and.push(
+      filters.contactStatus === "NOT_CONTACTED"
+        ? { OR: [{ contactWorkflow: null }, { contactWorkflow: { contactStatus: "NOT_CONTACTED" } }] }
+        : { contactWorkflow: { contactStatus: filters.contactStatus } },
+    );
+  }
+  if (filters.researcherAssignedId) {
+    and.push({ contactWorkflow: { researcherAssignedId: filters.researcherAssignedId } });
+  }
+  if (filters.overdueFollowup) {
+    and.push({ contactWorkflow: { nextFollowupAt: { lte: new Date() } } });
+  }
+
+  const where: Prisma.ParticipantWhereInput = { AND: and };
+
+  const [total, participants] = await Promise.all([
+    prisma.participant.count({ where }),
+    prisma.participant.findMany({
+      where,
+      include: {
+        streamer: { select: { displayName: true } },
+        contact: { select: { createdAt: true } },
+        contactWorkflow: { include: { researcherAssigned: { select: { name: true } } } },
+        contactAttempts: { orderBy: { attemptedAt: "desc" }, take: 1 },
+        _count: { select: { contactAttempts: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+
+  const rows: ContactQueueRow[] = participants.map((p) => ({
+    participantId: p.id,
+    anonymousCode: p.anonymousCode,
+    streamerName: p.streamer?.displayName ?? null,
+    rewardLabel: p.rewardLabel,
+    rewardRarity: p.rewardRarity,
+    contactSubmittedAt: (p.contact?.createdAt ?? p.createdAt).toISOString(),
+    contactStatus: (p.contactWorkflow?.contactStatus ?? "NOT_CONTACTED") as ContactStatus,
+    researcherAssignedId: p.contactWorkflow?.researcherAssignedId ?? null,
+    researcherAssignedName: p.contactWorkflow?.researcherAssigned?.name ?? null,
+    nextFollowupAt: p.contactWorkflow?.nextFollowupAt?.toISOString() ?? null,
+    prizeFulfillmentStatus: (p.contactWorkflow?.prizeFulfillmentStatus ?? null) as PrizeFulfillmentStatus | null,
+    contactNotes: p.contactWorkflow?.contactNotes ?? null,
+    attemptCount: p._count.contactAttempts,
+    lastAttemptAt: p.contactAttempts[0]?.attemptedAt.toISOString() ?? null,
+  }));
+
+  return { rows, total, page, pageSize };
+}
+
+export type DebriefQueueRow = {
+  participantId: string;
+  anonymousCode: string;
+  streamerName: string | null;
+  contactSubmittedAt: string;
+  debriefStatus: DebriefStatus;
+  debriefMethod: string | null;
+  debriefSentAt: string | null;
+  debriefNotes: string | null;
+  contactStatus: ContactStatus;
+};
+
+export type DebriefQueueFilters = {
+  q?: string;
+  debriefStatus?: DebriefStatus;
+  page?: number;
+  pageSize?: number;
+};
+
+const DEBRIEF_QUEUE_STATUSES: DebriefStatus[] = ["PENDING", "CONTACTED", "EXPLAINED", "UNREACHABLE"];
+
+export async function getDebriefQueue(
+  filters: DebriefQueueFilters = {},
+): Promise<{ rows: DebriefQueueRow[]; total: number; page: number; pageSize: number }> {
+  const page = filters.page ?? 1;
+  const pageSize = filters.pageSize ?? 25;
+
+  const and: Prisma.ParticipantWhereInput[] = [
+    { contact: { isNot: null } },
+    filters.debriefStatus
+      ? filters.debriefStatus === "PENDING"
+        ? { OR: [{ debrief: null }, { debrief: { debriefStatus: "PENDING" } }] }
+        : { debrief: { debriefStatus: filters.debriefStatus } }
+      : { OR: [{ debrief: null }, { debrief: { debriefStatus: { in: DEBRIEF_QUEUE_STATUSES } } }] },
+  ];
+  if (filters.q) {
+    and.push({
+      OR: [
+        { anonymousCode: { contains: filters.q, mode: "insensitive" } },
+        { streamer: { displayName: { contains: filters.q, mode: "insensitive" } } },
+      ],
+    });
+  }
+
+  const where: Prisma.ParticipantWhereInput = { AND: and };
+
+  const [total, participants] = await Promise.all([
+    prisma.participant.count({ where }),
+    prisma.participant.findMany({
+      where,
+      include: {
+        streamer: { select: { displayName: true } },
+        contact: { select: { createdAt: true } },
+        debrief: true,
+        contactWorkflow: { select: { contactStatus: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+
+  const rows: DebriefQueueRow[] = participants.map((p) => ({
+    participantId: p.id,
+    anonymousCode: p.anonymousCode,
+    streamerName: p.streamer?.displayName ?? null,
+    contactSubmittedAt: (p.contact?.createdAt ?? p.createdAt).toISOString(),
+    debriefStatus: (p.debrief?.debriefStatus ?? "PENDING") as DebriefStatus,
+    debriefMethod: p.debrief?.debriefMethod ?? null,
+    debriefSentAt: p.debrief?.debriefSentAt?.toISOString() ?? null,
+    debriefNotes: p.debrief?.debriefNotes ?? null,
+    contactStatus: (p.contactWorkflow?.contactStatus ?? "NOT_CONTACTED") as ContactStatus,
+  }));
+
+  return { rows, total, page, pageSize };
+}
