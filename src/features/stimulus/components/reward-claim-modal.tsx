@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -88,6 +88,14 @@ export function RewardClaimModal({
   function handleOpenChange(next: boolean) {
     if (!next && !submitting) void logEngagementEvent("ABANDONED");
     onOpenChange(next);
+  }
+
+  // react-hook-form's register(field, { onChange }) composes with its own
+  // internal handler rather than replacing it, unlike a plain onChange prop
+  // added after {...form.register(field)} would.
+  function trackOptionSelected(element: string) {
+    return (e: ChangeEvent<HTMLSelectElement>) =>
+      void logEngagementEvent("OPTION_SELECTED", { page: "claim-modal", element, eventValue: e.target.value });
   }
 
   async function onSubmit(values: EntryValues) {
@@ -202,7 +210,11 @@ export function RewardClaimModal({
           {streamerRequired && (
             <div>
               <LightFieldLabel htmlFor="entry-streamer">Which streamer&apos;s stream are you watching?</LightFieldLabel>
-              <LightSelect id="entry-streamer" {...form.register("streamerId")} defaultValue={defaultStreamerValue}>
+              <LightSelect
+                id="entry-streamer"
+                {...form.register("streamerId", { onChange: trackOptionSelected("streamerId") })}
+                defaultValue={defaultStreamerValue}
+              >
                 <option value="" disabled>
                   Select an option
                 </option>
@@ -225,7 +237,11 @@ export function RewardClaimModal({
 
           <div>
             <LightFieldLabel htmlFor="entry-game">Favourite Game Type</LightFieldLabel>
-            <LightSelect id="entry-game" {...form.register("favouriteGameType")} defaultValue="">
+            <LightSelect
+              id="entry-game"
+              {...form.register("favouriteGameType", { onChange: trackOptionSelected("favouriteGameType") })}
+              defaultValue=""
+            >
               <option value="" disabled>
                 Select an option
               </option>
@@ -239,7 +255,11 @@ export function RewardClaimModal({
 
           <div>
             <LightFieldLabel htmlFor="entry-frequency">Livestream Frequency</LightFieldLabel>
-            <LightSelect id="entry-frequency" {...form.register("livestreamFrequency")} defaultValue="">
+            <LightSelect
+              id="entry-frequency"
+              {...form.register("livestreamFrequency", { onChange: trackOptionSelected("livestreamFrequency") })}
+              defaultValue=""
+            >
               <option value="" disabled>
                 Select an option
               </option>

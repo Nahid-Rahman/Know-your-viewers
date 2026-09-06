@@ -34,6 +34,11 @@ model User {
   experiments Experiment[] @relation("ExperimentResearcher")
   streamer    Streamer?
 
+  assignedContacts    ContactWorkflow[]
+  contactAttempts     ContactAttempt[]
+  interviewsConducted Interview[]
+  exclusionsMade      ResearchEligibility[]
+
   @@map("users")
 }
 
@@ -71,6 +76,7 @@ model Experiment {
   participants   Participant[]
   surveys        Survey[]
   trackingLinks  TrackingLink[]
+  streamSessions StreamSession[]
 
   @@index([researcherId])
   @@map("experiments")
@@ -149,7 +155,8 @@ model Streamer {
   trackingLinks TrackingLink[]
   // Self-reported "which streamer are you watching" on Participant, not the
   // tracking-link click-through relation above.
-  viewers       Participant[]
+  viewers        Participant[]
+  streamSessions StreamSession[]
 
   @@map("streamers")
 }
@@ -199,6 +206,14 @@ model Participant {
   events          EngagementEvent[]
   supportRequests SupportRequest[]
 
+  // Researcher-workflow state — deliberately separate from ParticipantContact
+  // (see ContactWorkflow) so it survives the PII purge on debrief decline.
+  contactWorkflow     ContactWorkflow?
+  contactAttempts     ContactAttempt[]
+  interviewConsent    InterviewConsent?
+  interviews          Interview[]
+  researchEligibility ResearchEligibility?
+
   @@index([experimentId])
   @@index([conditionId])
   @@index([trackingLinkId])
@@ -240,6 +255,12 @@ model Consent {
   consentGiven   Boolean
   consentVersion String
   timestamp      DateTime      @default(now())
+  // Set independently of the original consentGiven value — e.g. a
+  // researcher recording a later phone-call withdrawal, unrelated to the
+  // participant's own on-page debrief answer.
+  withdrawn      Boolean       @default(false)
+  withdrawnAt    DateTime?
+  notes          String?
 
   participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
 
@@ -255,10 +276,36 @@ model Debrief {
   explanationShown Boolean  @default(true)
   permissionGiven  Boolean?
   timestamp        DateTime @default(now())
+  // Researcher-side human-follow-up debrief workflow (phone/WhatsApp/SMS) —
+  // separate from the automatic on-page explanation above. submitDebrief
+  // auto-sets this to ACKNOWLEDGED/DECLINED the moment a participant
+  // completes the on-page flow themselves; the other states are reached
+  // only through the researcher's own Debrief-queue actions, for
+  // participants who never got that far on their own.
+  debriefStatus DebriefStatus  @default(PENDING)
+  debriefMethod DebriefMethod?
+  debriefSentAt DateTime?
+  debriefNotes  String?
 
   participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
 
   @@map("debriefs")
+}
+
+enum DebriefStatus {
+  PENDING
+  CONTACTED
+  EXPLAINED
+  ACKNOWLEDGED
+  DECLINED
+  UNREACHABLE
+}
+
+enum DebriefMethod {
+  PHONE_CALL
+  WHATSAPP
+  SMS
+  OTHER
 }
 
 // ---------------------------------------------------------------------------
@@ -320,26 +367,79 @@ model Response {
 // Tracking / research links and anonymous engagement events
 // ---------------------------------------------------------------------------
 
-model TrackingLink {
-  id           String   @id @default(uuid())
-  experimentId String
-  streamerId   String?
-  uniqueCode   String   @unique
-  createdAt    DateTime @default(now())
+// One streamer broadcast/campaign a set of tracking links can be scoped to
+// — lets the researcher compare recruitment effectiveness by session (QR
+// overlay vs. chat-pinned link vs. description link all point at the same
+// StreamSession via separate TrackingLink rows).
+model StreamSession {
+  id                   String    @id @default(uuid())
+  experimentId         String
+  streamerId           String
+  platform             String?
+  gameName             String?
+  streamTitle          String?
+  streamStartTime      DateTime?
+  streamEndTime        DateTime?
+  campaignStartTime    DateTime?
+  campaignEndTime      DateTime?
+  estimatedViewerCount Int?
+  qrDisplayed          Boolean   @default(false)
+  chatLinkPosted       Boolean   @default(false)
+  notes                String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  experiment   Experiment    @relation(fields: [experimentId], references: [id], onDelete: Cascade)
-  streamer     Streamer?     @relation(fields: [streamerId], references: [id])
-  participants Participant[]
+  experiment    Experiment     @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  streamer      Streamer       @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+  trackingLinks TrackingLink[]
 
   @@index([experimentId])
+  @@index([streamerId])
+  @@map("stream_sessions")
+}
+
+enum EntrySource {
+  STREAM_QR
+  STREAM_CHAT_LINK
+  STREAM_DESCRIPTION
+  DIRECT
+  OTHER
+}
+
+model TrackingLink {
+  id              String      @id @default(uuid())
+  experimentId    String
+  streamerId      String?
+  streamSessionId String?
+  // STREAM_QR/STREAM_CHAT_LINK/STREAM_DESCRIPTION require a streamSessionId
+  // — enforced in the create/update actions, not at the schema level.
+  entrySource     EntrySource @default(OTHER)
+  uniqueCode      String      @unique
+  createdAt       DateTime    @default(now())
+
+  experiment    Experiment     @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  streamer      Streamer?      @relation(fields: [streamerId], references: [id])
+  streamSession StreamSession? @relation(fields: [streamSessionId], references: [id])
+  participants  Participant[]
+
+  @@index([experimentId])
+  @@index([streamSessionId])
   @@map("tracking_links")
 }
 
 enum EngagementEventType {
   PAGE_VIEW
+  CTA_CLICKED
   SPIN_CLICKED
   MODAL_OPENED
+  OPTION_SELECTED
   FIELD_FOCUSED
+  CONTACT_SUBMITTED
+  STUDY_COMPLETED
+  SURVEY_SUBMITTED
+  // Legacy — no longer written by new code, kept so historical rows stay
+  // valid. Previously fired identically by three unrelated actions; see
+  // CONTACT_SUBMITTED / STUDY_COMPLETED / SURVEY_SUBMITTED above.
   SUBMITTED
   ABANDONED
 }
@@ -350,6 +450,13 @@ model EngagementEvent {
   id            String              @id @default(uuid())
   participantId String
   type          EngagementEventType
+  // Which page/section this happened on, and the element/value involved —
+  // e.g. page="landing", element="cta-hero", or page="claim-modal",
+  // element="favouriteGameType", eventValue="Mobile Battle Royale".
+  page          String?
+  element       String?
+  eventValue    String?
+  metadata      Json?
   timestamp     DateTime            @default(now())
 
   participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
@@ -411,4 +518,188 @@ model SupportRequest {
 
   @@index([participantId])
   @@map("support_requests")
+}
+
+// ---------------------------------------------------------------------------
+// Outreach — human-follow-up contact, debrief queue, interviews, and the
+// final research-eligibility decision. All 1:1 with Participant except
+// ContactAttempt/Interview (append-only / re-schedulable history), and all
+// deliberately separate from ParticipantContact so this researcher-workflow
+// state survives the PII purge on debrief decline.
+// ---------------------------------------------------------------------------
+
+enum ContactStatus {
+  NOT_CONTACTED
+  CONTACTED
+  DEBRIEFED
+  INTERVIEW_INVITED
+  INTERVIEW_COMPLETED
+  UNREACHABLE
+}
+
+enum PrizeFulfillmentStatus {
+  SELECTED
+  WON
+  CLAIMED
+  NOT_CLAIMED
+  DELIVERED
+}
+
+model ContactWorkflow {
+  id                      String                  @id @default(uuid())
+  participantId           String                  @unique
+  contactStatus           ContactStatus           @default(NOT_CONTACTED)
+  preferredContactChannel String?
+  nextFollowupAt          DateTime?
+  researcherAssignedId    String?
+  // "Prize" itself is Participant.rewardLabel/rewardRarity (already set at
+  // claim time) — this is only the fulfillment/delivery workflow state.
+  prizeFulfillmentStatus  PrizeFulfillmentStatus?
+  prizeDeliveredAt        DateTime?
+  contactNotes            String?
+  updatedAt               DateTime                @updatedAt
+
+  participant        Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  researcherAssigned User?       @relation(fields: [researcherAssignedId], references: [id])
+
+  @@map("contact_workflows")
+}
+
+enum ContactOutcome {
+  ANSWERED
+  NO_ANSWER
+  WRONG_NUMBER
+  CALL_BACK_LATER
+  DEBRIEF_COMPLETED
+  DECLINED
+  UNREACHABLE
+}
+
+// Append-only log — contactAttemptCount/firstContactedAt/lastContactedAt are
+// derived from this (count/min/max) rather than stored as separate counters.
+model ContactAttempt {
+  id            String         @id @default(uuid())
+  participantId String
+  attemptedAt   DateTime       @default(now())
+  outcome       ContactOutcome
+  note          String?
+  researcherId  String?
+
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  researcher  User?       @relation(fields: [researcherId], references: [id])
+
+  @@index([participantId])
+  @@map("contact_attempts")
+}
+
+enum InterviewConsentAnswer {
+  PENDING
+  YES
+  NO
+}
+
+enum InterviewCandidateStatus {
+  NOT_INVITED
+  INVITED
+  ACCEPTED
+  DECLINED
+  SCHEDULED
+  COMPLETED
+  NO_SHOW
+  CANCELLED
+}
+
+model InterviewConsent {
+  id                   String                   @id @default(uuid())
+  participantId        String                   @unique
+  invited              Boolean                  @default(false)
+  invitedAt            DateTime?
+  consent              InterviewConsentAnswer   @default(PENDING)
+  consentAt            DateTime?
+  status               InterviewCandidateStatus @default(NOT_INVITED)
+  preferredContactTime String?
+  notes                String?
+  updatedAt            DateTime                 @updatedAt
+
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@map("interview_consents")
+}
+
+enum InterviewMode {
+  PHONE_CALL
+  WHATSAPP_CALL
+  GOOGLE_MEET
+  ZOOM
+  IN_PERSON
+  OTHER
+}
+
+enum InterviewRecordStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  RESCHEDULED
+}
+
+// Many per Participant — a reschedule is a new row, not an overwrite, so
+// interview history stays intact.
+model Interview {
+  id                  String                @id @default(uuid())
+  participantId       String
+  interviewerId       String?
+  interviewMode       InterviewMode?
+  status              InterviewRecordStatus @default(SCHEDULED)
+  scheduledAt         DateTime?
+  startedAt           DateTime?
+  endedAt             DateTime?
+  durationMinutes     Int?
+  recordingConsent    Boolean?
+  recordingAvailable  Boolean               @default(false)
+  transcriptAvailable Boolean               @default(false)
+  summary             String?
+  // Flexible free-form tags (e.g. "streamer trust", "prize motivation") —
+  // deliberately not a fixed enum/taxonomy, per the research design.
+  themes              String[]
+  researcherNotes     String?
+  transcriptFileUrl   String?
+  recordingFileUrl    String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  interviewer User?       @relation(fields: [interviewerId], references: [id])
+
+  @@index([participantId])
+  @@map("interviews")
+}
+
+enum ExclusionReason {
+  INCOMPLETE
+  DUPLICATE
+  TECHNICAL_ERROR
+  TEST_ACCOUNT
+  INVALID_SUBMISSION
+  PARTICIPANT_DECLINED_DATA_USE
+  PARTICIPANT_WITHDREW
+  OTHER
+}
+
+// Never auto-populated — eligible defaults true, and only a researcher's
+// explicit action ever sets eligible=false / exclusionReason.
+model ResearchEligibility {
+  id               String           @id @default(uuid())
+  participantId    String           @unique
+  eligible         Boolean          @default(true)
+  exclusionReason  ExclusionReason?
+  excludedAt       DateTime?
+  excludedByUserId String?
+  reviewNotes      String?
+  updatedAt        DateTime         @updatedAt
+
+  participant    Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  excludedByUser User?       @relation(fields: [excludedByUserId], references: [id])
+
+  @@map("research_eligibility")
 }

@@ -216,15 +216,73 @@ async function main() {
           },
         ],
       },
-      trackingLinks: {
+      streamSessions: {
         create: [
-          { uniqueCode: "RFQ-8KX2", streamerId: streamer1.id },
-          { uniqueCode: "NVA-3PL9", streamerId: streamer2.id },
+          {
+            streamerId: streamer1.id,
+            platform: "Facebook Gaming",
+            gameName: "Mobile Battle Royale",
+            streamTitle: "Weekend Squad Grind",
+            streamStartTime: new Date("2026-08-23T13:00:00Z"),
+            streamEndTime: new Date("2026-08-23T16:00:00Z"),
+            campaignStartTime: new Date("2026-08-23T13:00:00Z"),
+            campaignEndTime: new Date("2026-08-23T16:00:00Z"),
+            estimatedViewerCount: 850,
+            qrDisplayed: true,
+            chatLinkPosted: true,
+            notes: "QR shown on an intro overlay; link also pinned in chat.",
+          },
+          {
+            streamerId: streamer2.id,
+            platform: "YouTube",
+            gameName: "Tactical FPS",
+            streamTitle: "Ranked Grind — Road to Radiant",
+            streamStartTime: new Date("2026-08-24T18:00:00Z"),
+            streamEndTime: new Date("2026-08-24T21:00:00Z"),
+            campaignStartTime: new Date("2026-08-24T18:00:00Z"),
+            campaignEndTime: new Date("2026-08-24T21:00:00Z"),
+            estimatedViewerCount: 420,
+            qrDisplayed: false,
+            chatLinkPosted: true,
+            notes: "Link mentioned verbally and pinned; no on-screen QR this session.",
+          },
         ],
       },
     },
-    include: { conditions: true, trackingLinks: true, surveys: true },
+    include: { conditions: true, surveys: true, streamSessions: true },
   });
+
+  const [rafiqSession, novaSession] = experiment.streamSessions;
+
+  const trackingLinks = await Promise.all([
+    prisma.trackingLink.create({
+      data: {
+        experimentId: experiment.id,
+        uniqueCode: "RFQ-8KX2",
+        streamerId: streamer1.id,
+        streamSessionId: rafiqSession.id,
+        entrySource: "STREAM_CHAT_LINK",
+      },
+    }),
+    prisma.trackingLink.create({
+      data: {
+        experimentId: experiment.id,
+        uniqueCode: "RFQ-QR7T",
+        streamerId: streamer1.id,
+        streamSessionId: rafiqSession.id,
+        entrySource: "STREAM_QR",
+      },
+    }),
+    prisma.trackingLink.create({
+      data: {
+        experimentId: experiment.id,
+        uniqueCode: "NVA-3PL9",
+        streamerId: streamer2.id,
+        streamSessionId: novaSession.id,
+        entrySource: "STREAM_CHAT_LINK",
+      },
+    }),
+  ]);
 
   await prisma.experiment.create({
     data: {
@@ -238,11 +296,12 @@ async function main() {
   });
 
   const condition = experiment.conditions[0];
-  const link = experiment.trackingLinks[0];
+  const link = trackingLinks[0];
   const survey = experiment.surveys[0];
 
   for (let i = 0; i < 20; i++) {
     const submitted = i % 3 !== 0;
+    const permissionGiven = i % 4 !== 0;
     const participant = await prisma.participant.create({
       data: {
         experimentId: experiment.id,
@@ -253,9 +312,16 @@ async function main() {
         consent: { create: { consentGiven: true, consentVersion: "1.0" } },
         events: {
           create: [
-            { type: "PAGE_VIEW" },
-            { type: "SPIN_CLICKED" },
-            ...(submitted ? [{ type: "MODAL_OPENED" as const }, { type: "SUBMITTED" as const }] : [{ type: "ABANDONED" as const }]),
+            { type: "PAGE_VIEW", page: "landing" },
+            { type: "CTA_CLICKED", page: "landing", element: "hero-cta" },
+            { type: "SPIN_CLICKED", page: "landing" },
+            ...(submitted
+              ? [
+                  { type: "MODAL_OPENED" as const, page: "landing" },
+                  { type: "CONTACT_SUBMITTED" as const, page: "claim-modal" },
+                  { type: "STUDY_COMPLETED" as const, page: "debrief" },
+                ]
+              : [{ type: "ABANDONED" as const, page: "claim-modal" }]),
           ],
         },
         ...(submitted
@@ -268,7 +334,13 @@ async function main() {
                   livestreamFrequency: "Weekly livestream viewer",
                 },
               },
-              debrief: { create: { explanationShown: true, permissionGiven: i % 4 !== 0 } },
+              debrief: {
+                create: {
+                  explanationShown: true,
+                  permissionGiven,
+                  debriefStatus: permissionGiven ? "ACKNOWLEDGED" : "DECLINED",
+                },
+              },
             }
           : {}),
       },
@@ -286,9 +358,86 @@ async function main() {
         },
       });
     }
+
+    // A couple of representative rows for the outreach/interview/eligibility
+    // screens, so they render real data instead of only empty states.
+    if (i === 1) {
+      await prisma.contactWorkflow.create({
+        data: {
+          participantId: participant.id,
+          contactStatus: "CONTACTED",
+          researcherAssignedId: researcher.id,
+          nextFollowupAt: new Date("2026-09-10T12:00:00Z"),
+          prizeFulfillmentStatus: "WON",
+          contactNotes: "Called once, left a voicemail asking to call back.",
+        },
+      });
+      await prisma.contactAttempt.create({
+        data: {
+          participantId: participant.id,
+          outcome: "NO_ANSWER",
+          note: "No answer, left voicemail.",
+          researcherId: researcher.id,
+        },
+      });
+      await prisma.interviewConsent.create({
+        data: {
+          participantId: participant.id,
+          invited: true,
+          invitedAt: new Date("2026-09-07T09:00:00Z"),
+          consent: "YES",
+          consentAt: new Date("2026-09-07T10:00:00Z"),
+          status: "ACCEPTED",
+          preferredContactTime: "Weekday evenings",
+        },
+      });
+    }
+    if (i === 2) {
+      await prisma.contactWorkflow.create({
+        data: {
+          participantId: participant.id,
+          contactStatus: "DEBRIEFED",
+          researcherAssignedId: researcher.id,
+          prizeFulfillmentStatus: "DELIVERED",
+          prizeDeliveredAt: new Date("2026-09-05T15:00:00Z"),
+          contactNotes: "Confirmed reward delivery over WhatsApp.",
+        },
+      });
+      await prisma.interviewConsent.create({
+        data: {
+          participantId: participant.id,
+          invited: true,
+          invitedAt: new Date("2026-09-06T09:00:00Z"),
+          consent: "YES",
+          consentAt: new Date("2026-09-06T09:30:00Z"),
+          status: "SCHEDULED",
+        },
+      });
+      await prisma.interview.create({
+        data: {
+          participantId: participant.id,
+          interviewerId: researcher.id,
+          interviewMode: "GOOGLE_MEET",
+          status: "SCHEDULED",
+          scheduledAt: new Date("2026-09-12T14:00:00Z"),
+        },
+      });
+    }
+    if (i === 4) {
+      await prisma.researchEligibility.create({
+        data: {
+          participantId: participant.id,
+          eligible: false,
+          exclusionReason: "TEST_ACCOUNT",
+          excludedAt: new Date(),
+          excludedByUserId: researcher.id,
+          reviewNotes: "Internal test submission during launch QA.",
+        },
+      });
+    }
   }
 
-  console.log(`Seeded experiment ${experiment.id} with ${experiment.trackingLinks.length} tracking links.`);
+  console.log(`Seeded experiment ${experiment.id} with ${trackingLinks.length} tracking links.`);
 }
 
 main()

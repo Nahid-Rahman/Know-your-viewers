@@ -6,17 +6,39 @@ import { prisma } from "@/lib/prisma";
 import { encryptContact, hashEmail } from "@/lib/crypto";
 import { PARTICIPANT_COOKIE } from "@/lib/participant";
 import type { EngagementEventType, Rarity } from "@/generated/prisma/enums";
+import type { Prisma } from "@/generated/prisma/client";
 
 async function getParticipantIdFromCookie(): Promise<string | null> {
   const cookieStore = await cookies();
   return cookieStore.get(PARTICIPANT_COOKIE)?.value ?? null;
 }
 
+export type EngagementEventOptions = {
+  page?: string;
+  element?: string;
+  eventValue?: string;
+  metadata?: Record<string, unknown>;
+};
+
 /** Fire-and-forget funnel telemetry from client interactions (spin, modal open, field focus, abandon). */
-export async function logEngagementEvent(type: EngagementEventType): Promise<void> {
+export async function logEngagementEvent(
+  type: EngagementEventType,
+  options?: EngagementEventOptions,
+): Promise<void> {
   const participantId = await getParticipantIdFromCookie();
   if (!participantId) return;
-  await prisma.engagementEvent.create({ data: { participantId, type } }).catch(() => {});
+  await prisma.engagementEvent
+    .create({
+      data: {
+        participantId,
+        type,
+        page: options?.page,
+        element: options?.element,
+        eventValue: options?.eventValue,
+        metadata: options?.metadata as Prisma.InputJsonValue | undefined,
+      },
+    })
+    .catch(() => {});
 }
 
 const entrySchema = z.object({
@@ -126,7 +148,9 @@ export async function submitEntry(
           }),
         ]
       : []),
-    prisma.engagementEvent.create({ data: { participantId: participant.id, type: "SUBMITTED" } }),
+    prisma.engagementEvent.create({
+      data: { participantId: participant.id, type: "CONTACT_SUBMITTED", page: "claim-modal" },
+    }),
   ]);
 
   return { responseCode: participant.anonymousCode };
@@ -137,11 +161,17 @@ export async function submitDebrief(permissionGiven: boolean): Promise<{ error: 
   if (!participantId) return { error: "Your session expired." };
 
   const consentVersion = process.env.CONSENT_VERSION ?? "1.0";
+  // The on-page flow always explains and asks in one step, so completing it
+  // is either an acknowledged "yes" or a declined "no" — never one of the
+  // in-between researcher-follow-up states (those are only reachable via
+  // the researcher's own Debrief-queue actions, for participants who never
+  // reach this page on their own).
+  const debriefStatus = permissionGiven ? "ACKNOWLEDGED" : "DECLINED";
 
   await prisma.debrief.upsert({
     where: { participantId },
-    update: { explanationShown: true, permissionGiven },
-    create: { participantId, explanationShown: true, permissionGiven },
+    update: { explanationShown: true, permissionGiven, debriefStatus },
+    create: { participantId, explanationShown: true, permissionGiven, debriefStatus },
   });
 
   await prisma.consent.upsert({
@@ -160,7 +190,9 @@ export async function submitDebrief(permissionGiven: boolean): Promise<{ error: 
     await prisma.participant.update({ where: { id: participantId }, data: { consentStatus: "DECLINED" } });
   }
 
-  await prisma.engagementEvent.create({ data: { participantId, type: "SUBMITTED" } }).catch(() => {});
+  await prisma.engagementEvent
+    .create({ data: { participantId, type: "STUDY_COMPLETED", page: "debrief" } })
+    .catch(() => {});
 
   return { ok: true };
 }
@@ -193,7 +225,9 @@ export async function submitSurveyResponse(
     create: { surveyId, participantId, answers },
   });
 
-  await prisma.engagementEvent.create({ data: { participantId, type: "SUBMITTED" } }).catch(() => {});
+  await prisma.engagementEvent
+    .create({ data: { participantId, type: "SURVEY_SUBMITTED", page: "survey", eventValue: surveyId } })
+    .catch(() => {});
 
   return { ok: true };
 }

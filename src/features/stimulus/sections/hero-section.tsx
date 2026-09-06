@@ -1,9 +1,10 @@
-import Link from "next/link";
 import { EyebrowLabel } from "@/components/common/eyebrow-label";
 import { RichHeadline } from "@/components/common/rich-headline";
 import { CountdownChip } from "@/components/common/countdown-chip";
 import { RewardOrb } from "@/components/common/reward-orb";
+import Link from "next/link";
 import { HeroContactCard } from "@/features/stimulus/components/hero-contact-card";
+import { CtaLink } from "@/features/stimulus/components/cta-link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { StimulusRuntimeConfig } from "@/features/stimulus/config";
@@ -36,12 +37,13 @@ export function HeroSection({
           )}
 
           <div className="mt-7 flex flex-wrap items-center gap-5">
-            <Link
+            <CtaLink
               href="/#spin"
+              element="hero-cta"
               className={cn(buttonVariants({ size: "lg" }), "bg-gradient-primary px-6 text-white hover:opacity-90")}
             >
               TRY YOUR LUCK
-            </Link>
+            </CtaLink>
             <Link href="/#how-it-works" className="text-sm font-semibold text-muted-foreground hover:text-foreground">
               How it works &rarr;
             </Link>
