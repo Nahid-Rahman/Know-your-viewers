@@ -110,8 +110,8 @@ export function TrackingLinkRow({
           </SelectContent>
         </Select>
       </TableCell>
-      <TableCell>{link.visits.toLocaleString()}</TableCell>
-      <TableCell>{link.conversions.toLocaleString()}</TableCell>
+      <TableCell>{link.visits.toLocaleString("en-US")}</TableCell>
+      <TableCell>{link.conversions.toLocaleString("en-US")}</TableCell>
       <TableCell>{rate}%</TableCell>
       <TableCell>
         <ConfirmDeleteButton

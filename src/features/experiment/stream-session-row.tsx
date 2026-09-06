@@ -6,14 +6,6 @@ import { StreamSessionDialog } from "@/features/experiment/stream-session-dialog
 import { deleteStreamSession } from "@/lib/actions/stream-sessions";
 import type { StreamSessionRow as StreamSessionRowData } from "@/lib/queries/research";
 
-function fmt(iso: string | null) {
-  if (!iso) return "—";
-  // Fixed locale (not `undefined`) — this is a Client Component, so it renders once during
-  // SSR and again during hydration; letting the runtime's default locale decide risks a
-  // server/browser mismatch and a hydration error even though the visible result is correct.
-  return new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
-}
-
 export function StreamSessionRow({
   session,
   streamers,
@@ -26,8 +18,8 @@ export function StreamSessionRow({
       <TableCell className="font-medium">{session.streamerName}</TableCell>
       <TableCell>{session.streamTitle ?? "—"}</TableCell>
       <TableCell>{session.gameName ?? "—"}</TableCell>
-      <TableCell>{fmt(session.streamStartTime)}</TableCell>
-      <TableCell>{session.estimatedViewerCount?.toLocaleString() ?? "—"}</TableCell>
+      <TableCell>{session.streamStartLabel}</TableCell>
+      <TableCell>{session.estimatedViewerCountLabel}</TableCell>
       <TableCell>
         {session.qrDisplayed ? "QR" : ""}
         {session.qrDisplayed && session.chatLinkPosted ? " · " : ""}

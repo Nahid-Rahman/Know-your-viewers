@@ -166,10 +166,14 @@ export type StreamSessionRow = {
   gameName: string | null;
   streamTitle: string | null;
   streamStartTime: string | null;
+  /** Pre-formatted server-side so the (client) row component never re-derives locale-sensitive text during hydration. */
+  streamStartLabel: string;
   streamEndTime: string | null;
   campaignStartTime: string | null;
   campaignEndTime: string | null;
   estimatedViewerCount: number | null;
+  /** Pre-formatted server-side for the same reason as `streamStartLabel`. */
+  estimatedViewerCountLabel: string;
   qrDisplayed: boolean;
   chatLinkPosted: boolean;
   notes: string | null;
@@ -203,10 +207,15 @@ export async function getStreamSessions(experimentId: string): Promise<StreamSes
         gameName: s.gameName,
         streamTitle: s.streamTitle,
         streamStartTime: s.streamStartTime ? s.streamStartTime.toISOString() : null,
+        streamStartLabel: s.streamStartTime
+          ? s.streamStartTime.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
+          : "—",
         streamEndTime: s.streamEndTime ? s.streamEndTime.toISOString() : null,
         campaignStartTime: s.campaignStartTime ? s.campaignStartTime.toISOString() : null,
         campaignEndTime: s.campaignEndTime ? s.campaignEndTime.toISOString() : null,
         estimatedViewerCount: s.estimatedViewerCount,
+        estimatedViewerCountLabel:
+          s.estimatedViewerCount != null ? s.estimatedViewerCount.toLocaleString("en-US") : "—",
         qrDisplayed: s.qrDisplayed,
         chatLinkPosted: s.chatLinkPosted,
         notes: s.notes,
