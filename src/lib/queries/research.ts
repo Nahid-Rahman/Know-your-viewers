@@ -13,7 +13,12 @@ import type {
   ConditionModel as Condition,
   StreamerModel as Streamer,
 } from "@/generated/prisma/models";
+import type { Prisma } from "@/generated/prisma/client";
+import type { DebriefStatus, InterviewCandidateStatus } from "@/generated/prisma/enums";
+import type { EntrySourceValue } from "@/lib/entry-source";
 import { DEFAULT_SITE_CONTENT, type SiteContentValues } from "@/lib/site-content-defaults";
+
+export { RECRUITMENT_SOURCE_LABELS, type EntrySourceValue } from "@/lib/entry-source";
 
 function pct(n: number, total: number) {
   return total > 0 ? Math.round((n / total) * 100) : 0;
@@ -265,19 +270,11 @@ export async function getDashboardSummary(researcherId: string): Promise<Dashboa
 }
 
 export type RecruitmentSourceRow = {
-  source: "STREAM_QR" | "STREAM_CHAT_LINK" | "STREAM_DESCRIPTION" | "DIRECT" | "OTHER";
+  source: EntrySourceValue;
   visits: number;
   studyStarts: number;
   completions: number;
   completionRate: number;
-};
-
-export const RECRUITMENT_SOURCE_LABELS: Record<RecruitmentSourceRow["source"], string> = {
-  STREAM_QR: "QR Code",
-  STREAM_CHAT_LINK: "Chat Link",
-  STREAM_DESCRIPTION: "Stream Description",
-  DIRECT: "Direct",
-  OTHER: "Other",
 };
 
 export async function getRecruitmentSourceBreakdown(researcherId: string): Promise<RecruitmentSourceRow[]> {
@@ -484,39 +481,398 @@ export async function getSurveysForExperiment(experimentId: string) {
   });
 }
 
-export type ParticipantRow = {
-  anonymousCode: string;
-  conditionName: string;
-  streamerName: string | null;
-  consentStatus: "PENDING" | "GRANTED" | "DECLINED";
-  spun: boolean;
-  submittedContact: boolean;
-  debriefed: boolean;
-  permissionGiven: boolean | null;
-};
+// ---------------------------------------------------------------------------
+// Participant journey — funnel-stage/study-status/data-use-permission are all
+// derived at query time from EngagementEvent + Debrief/Consent/InterviewConsent
+// presence, never stored redundantly (see the schema's own comments).
+// ---------------------------------------------------------------------------
 
-/** Deliberately excludes emailOrPhone / streamNickname — contact details live in a separate encrypted table and are never rendered here. */
-export async function getParticipantRows(experimentId: string): Promise<ParticipantRow[]> {
-  const participants = await prisma.participant.findMany({
-    where: { experimentId },
-    include: {
-      condition: { select: { name: true } },
-      streamer: { select: { displayName: true } },
-      contact: { select: { id: true } },
-      debrief: { select: { permissionGiven: true } },
-      events: { where: { type: "SPIN_CLICKED" }, select: { id: true }, take: 1 },
-    },
-    orderBy: { createdAt: "asc" },
+const FUNNEL_STAGE_ORDER = [
+  "Website Visit",
+  "CTA Click",
+  "Study Started",
+  "Task Completed",
+  "Contact Submitted",
+  "Study Completed",
+  "Debrief Completed",
+  "Interview Accepted",
+] as const;
+
+const DEBRIEF_TERMINAL_STATUSES = ["ACKNOWLEDGED", "DECLINED"];
+const INTERVIEW_ACCEPTED_STATUSES = ["ACCEPTED", "SCHEDULED", "COMPLETED", "NO_SHOW"];
+
+/**
+ * "Study status" only distinguishes completed vs. dropped (not the spec's
+ * literal visited/started/in_progress/dropped split) — an admin reviewing
+ * this well after the fact can't honestly tell "still in progress right now"
+ * from "gave up hours ago" without an arbitrary time threshold, which the
+ * research rules explicitly ask not to invent. "Current stage" below still
+ * shows exactly where a dropped participant stopped.
+ */
+function deriveFunnel(input: {
+  eventTypes: Set<string>;
+  hasContact: boolean;
+  debriefStatus: string | null;
+  interviewStatus: string | null;
+}): { currentStage: string; studyStatus: "completed" | "dropped" } {
+  const reached = [
+    input.eventTypes.has("PAGE_VIEW"),
+    input.eventTypes.has("CTA_CLICKED"),
+    input.eventTypes.has("SPIN_CLICKED"),
+    input.eventTypes.has("MODAL_OPENED"),
+    input.hasContact || input.eventTypes.has("CONTACT_SUBMITTED"),
+    input.eventTypes.has("STUDY_COMPLETED"),
+    Boolean(input.debriefStatus && DEBRIEF_TERMINAL_STATUSES.includes(input.debriefStatus)),
+    Boolean(input.interviewStatus && INTERVIEW_ACCEPTED_STATUSES.includes(input.interviewStatus)),
+  ];
+  let lastIndex = -1;
+  reached.forEach((r, i) => {
+    if (r) lastIndex = i;
   });
+  return {
+    currentStage: lastIndex >= 0 ? FUNNEL_STAGE_ORDER[lastIndex] : "No Activity",
+    studyStatus: reached[5] ? "completed" : "dropped",
+  };
+}
 
-  return participants.map((p) => ({
-    anonymousCode: p.anonymousCode,
-    conditionName: p.condition?.name ?? "Unassigned",
-    streamerName: p.streamer?.displayName ?? null,
-    consentStatus: p.consentStatus,
-    spun: p.events.length > 0,
-    submittedContact: Boolean(p.contact),
-    debriefed: Boolean(p.debrief),
-    permissionGiven: p.debrief?.permissionGiven ?? null,
+type DataUsePermission = "pending" | "yes" | "no" | "withdrawn";
+
+function deriveDataUsePermission(consent: { consentGiven: boolean; withdrawn: boolean } | null): DataUsePermission {
+  if (!consent) return "pending";
+  if (consent.withdrawn) return "withdrawn";
+  return consent.consentGiven ? "yes" : "no";
+}
+
+/** Groups a participant's events by `page` in chronological order; a visit's duration is time-until-the-next-page's-first-event (the last/ongoing page has no known end, so null). */
+function computePageDurations(
+  events: { page: string | null; timestamp: Date }[],
+): { page: string; enteredAt: string; leftAt: string | null; durationSeconds: number | null; visitCount: number }[] {
+  const tagged = [...events].filter((e) => e.page).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+  const visits: { page: string; enteredAt: Date; leftAt: Date | null }[] = [];
+
+  for (const e of tagged) {
+    const last = visits[visits.length - 1];
+    if (last && last.page === e.page && last.leftAt === null) continue;
+    if (last && last.leftAt === null) last.leftAt = e.timestamp;
+    if (!last || last.page !== e.page) visits.push({ page: e.page!, enteredAt: e.timestamp, leftAt: null });
+  }
+
+  const byPage = new Map<string, { totalSeconds: number; hasOngoing: boolean; visitCount: number; firstEnter: Date; lastLeft: Date | null }>();
+  for (const v of visits) {
+    const entry = byPage.get(v.page) ?? {
+      totalSeconds: 0,
+      hasOngoing: false,
+      visitCount: 0,
+      firstEnter: v.enteredAt,
+      lastLeft: null,
+    };
+    entry.visitCount += 1;
+    if (v.leftAt) {
+      entry.totalSeconds += (v.leftAt.getTime() - v.enteredAt.getTime()) / 1000;
+      entry.lastLeft = v.leftAt;
+    } else {
+      entry.hasOngoing = true;
+    }
+    if (v.enteredAt < entry.firstEnter) entry.firstEnter = v.enteredAt;
+    byPage.set(v.page, entry);
+  }
+
+  return Array.from(byPage.entries()).map(([page, e]) => ({
+    page,
+    enteredAt: e.firstEnter.toISOString(),
+    leftAt: e.lastLeft ? e.lastLeft.toISOString() : null,
+    durationSeconds: e.totalSeconds > 0 ? Math.round(e.totalSeconds) : null,
+    visitCount: e.visitCount,
   }));
 }
+
+export type ParticipantListFilters = {
+  q?: string;
+  experimentId?: string;
+  streamerId?: string;
+  entrySource?: EntrySourceValue;
+  studyStatus?: "completed" | "dropped";
+  contactSubmitted?: boolean;
+  debriefStatus?: DebriefStatus;
+  dataUsePermission?: DataUsePermission;
+  interviewStatus?: InterviewCandidateStatus;
+  eligibility?: "eligible" | "excluded";
+  /** ISO date (yyyy-mm-dd) — inclusive, compared against Participant.createdAt. */
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+export type ParticipantListRow = {
+  id: string;
+  anonymousCode: string;
+  streamerName: string | null;
+  streamSessionTitle: string | null;
+  entrySource: EntrySourceValue;
+  firstVisit: string;
+  currentStage: string;
+  studyStatus: "completed" | "dropped";
+  contactSubmitted: boolean;
+  debriefStatus: string;
+  dataUsePermission: DataUsePermission;
+  interviewStatus: string;
+  eligibility: "eligible" | "excluded";
+};
+
+export type ParticipantListResult = {
+  rows: ParticipantListRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+/** Deliberately excludes emailOrPhone/phone — contact details live in a separate encrypted table and are never rendered in a list view. */
+export async function getParticipantRows(filters: ParticipantListFilters = {}): Promise<ParticipantListResult> {
+  const page = Math.max(filters.page ?? 1, 1);
+  const pageSize = Math.min(Math.max(filters.pageSize ?? 25, 1), 100);
+
+  const and: Prisma.ParticipantWhereInput[] = [];
+  if (filters.experimentId) and.push({ experimentId: filters.experimentId });
+  if (filters.q) {
+    and.push({
+      OR: [
+        { anonymousCode: { contains: filters.q, mode: "insensitive" } },
+        { streamer: { displayName: { contains: filters.q, mode: "insensitive" } } },
+        { trackingLink: { streamer: { displayName: { contains: filters.q, mode: "insensitive" } } } },
+      ],
+    });
+  }
+  if (filters.streamerId) {
+    and.push({ OR: [{ streamerId: filters.streamerId }, { trackingLink: { streamerId: filters.streamerId } }] });
+  }
+  if (filters.entrySource === "DIRECT") and.push({ trackingLinkId: null });
+  else if (filters.entrySource) and.push({ trackingLink: { entrySource: filters.entrySource } });
+  if (filters.studyStatus === "completed") and.push({ events: { some: { type: "STUDY_COMPLETED" } } });
+  if (filters.studyStatus === "dropped") and.push({ events: { none: { type: "STUDY_COMPLETED" } } });
+  if (filters.contactSubmitted === true) and.push({ contact: { isNot: null } });
+  if (filters.contactSubmitted === false) and.push({ contact: null });
+  if (filters.debriefStatus) and.push({ debrief: { debriefStatus: filters.debriefStatus } });
+  if (filters.dataUsePermission === "pending") and.push({ consent: null });
+  if (filters.dataUsePermission === "yes") and.push({ consent: { consentGiven: true, withdrawn: false } });
+  if (filters.dataUsePermission === "no") and.push({ consent: { consentGiven: false, withdrawn: false } });
+  if (filters.dataUsePermission === "withdrawn") and.push({ consent: { withdrawn: true } });
+  if (filters.interviewStatus) and.push({ interviewConsent: { status: filters.interviewStatus } });
+  if (filters.eligibility === "excluded") and.push({ researchEligibility: { eligible: false } });
+  if (filters.eligibility === "eligible") {
+    and.push({ OR: [{ researchEligibility: null }, { researchEligibility: { eligible: true } }] });
+  }
+  if (filters.from) and.push({ createdAt: { gte: new Date(`${filters.from}T00:00:00.000Z`) } });
+  if (filters.to) and.push({ createdAt: { lte: new Date(`${filters.to}T23:59:59.999Z`) } });
+
+  const where: Prisma.ParticipantWhereInput = and.length ? { AND: and } : {};
+
+  const [total, participants] = await Promise.all([
+    prisma.participant.count({ where }),
+    prisma.participant.findMany({
+      where,
+      include: {
+        streamer: { select: { displayName: true } },
+        trackingLink: {
+          include: {
+            streamer: { select: { displayName: true } },
+            streamSession: { select: { streamTitle: true } },
+          },
+        },
+        contact: { select: { id: true } },
+        debrief: { select: { debriefStatus: true } },
+        consent: { select: { consentGiven: true, withdrawn: true } },
+        interviewConsent: { select: { status: true } },
+        researchEligibility: { select: { eligible: true } },
+        events: { select: { type: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+
+  const rows: ParticipantListRow[] = participants.map((p) => {
+    const eventTypes = new Set<string>(p.events.map((e) => e.type));
+    const { currentStage, studyStatus } = deriveFunnel({
+      eventTypes,
+      hasContact: Boolean(p.contact),
+      debriefStatus: p.debrief?.debriefStatus ?? null,
+      interviewStatus: p.interviewConsent?.status ?? null,
+    });
+
+    return {
+      id: p.id,
+      anonymousCode: p.anonymousCode,
+      streamerName: p.streamer?.displayName ?? p.trackingLink?.streamer?.displayName ?? null,
+      streamSessionTitle: p.trackingLink?.streamSession?.streamTitle ?? null,
+      entrySource: (p.trackingLinkId ? (p.trackingLink?.entrySource ?? "OTHER") : "DIRECT") as EntrySourceValue,
+      firstVisit: p.createdAt.toISOString(),
+      currentStage,
+      studyStatus,
+      contactSubmitted: Boolean(p.contact),
+      debriefStatus: p.debrief?.debriefStatus ?? "PENDING",
+      dataUsePermission: deriveDataUsePermission(p.consent),
+      interviewStatus: p.interviewConsent?.status ?? "NOT_INVITED",
+      eligibility: p.researchEligibility?.eligible === false ? "excluded" : "eligible",
+    };
+  });
+
+  return { rows, total, page, pageSize };
+}
+
+/** Full research profile for one participant — the 7-section detail page reads straight off this. */
+export async function getParticipantDetail(participantId: string) {
+  const participant = await prisma.participant.findUnique({
+    where: { id: participantId },
+    include: {
+      experiment: { select: { title: true } },
+      condition: { select: { name: true } },
+      streamer: { select: { displayName: true } },
+      trackingLink: {
+        include: {
+          streamer: { select: { displayName: true } },
+          streamSession: { select: { streamTitle: true } },
+        },
+      },
+      contact: { select: { id: true, createdAt: true } },
+      contactWorkflow: { include: { researcherAssigned: { select: { name: true } } } },
+      contactAttempts: { include: { researcher: { select: { name: true } } }, orderBy: { attemptedAt: "desc" } },
+      debrief: true,
+      consent: true,
+      interviewConsent: true,
+      interviews: { include: { interviewer: { select: { name: true } } }, orderBy: { createdAt: "desc" } },
+      researchEligibility: { include: { excludedByUser: { select: { name: true } } } },
+      responses: { include: { survey: { include: { questions: true } } } },
+      events: { orderBy: { timestamp: "asc" } },
+    },
+  });
+  if (!participant) return null;
+
+  const eventTypes = new Set<string>(participant.events.map((e) => e.type));
+  const { currentStage, studyStatus } = deriveFunnel({
+    eventTypes,
+    hasContact: Boolean(participant.contact),
+    debriefStatus: participant.debrief?.debriefStatus ?? null,
+    interviewStatus: participant.interviewConsent?.status ?? null,
+  });
+
+  const lastActivity = participant.events.length
+    ? participant.events[participant.events.length - 1].timestamp.toISOString()
+    : null;
+
+  const responses = participant.responses.flatMap((r) => {
+    const answers = r.answers as Record<string, string | number>;
+    return r.survey.questions
+      .slice()
+      .sort((a, b) => a.order - b.order)
+      .filter((q) => answers[q.id] !== undefined)
+      .map((q) => ({
+        surveyTitle: r.survey.title,
+        questionOrder: q.order,
+        questionText: q.questionText,
+        answer: answers[q.id],
+      }));
+  });
+
+  return {
+    id: participant.id,
+    anonymousCode: participant.anonymousCode,
+    experimentTitle: participant.experiment.title,
+    conditionName: participant.condition?.name ?? null,
+    streamerName: participant.streamer?.displayName ?? null,
+    linkStreamerName: participant.trackingLink?.streamer?.displayName ?? null,
+    streamSessionTitle: participant.trackingLink?.streamSession?.streamTitle ?? null,
+    entrySource: (participant.trackingLinkId
+      ? (participant.trackingLink?.entrySource ?? "OTHER")
+      : "DIRECT") as EntrySourceValue,
+    firstVisit: participant.createdAt.toISOString(),
+    lastActivity,
+    currentStage,
+    studyStatus,
+    rewardLabel: participant.rewardLabel,
+    rewardRarity: participant.rewardRarity,
+
+    events: participant.events.map((e) => ({
+      id: e.id,
+      type: e.type as string,
+      page: e.page,
+      element: e.element,
+      eventValue: e.eventValue,
+      timestamp: e.timestamp.toISOString(),
+    })),
+    pageDurations: computePageDurations(participant.events),
+
+    responses,
+
+    hasContact: Boolean(participant.contact),
+    contactSubmittedAt: participant.contact?.createdAt.toISOString() ?? null,
+    contactWorkflow: participant.contactWorkflow
+      ? {
+          contactStatus: participant.contactWorkflow.contactStatus as string,
+          preferredContactChannel: participant.contactWorkflow.preferredContactChannel,
+          nextFollowupAt: participant.contactWorkflow.nextFollowupAt?.toISOString() ?? null,
+          researcherAssignedName: participant.contactWorkflow.researcherAssigned?.name ?? null,
+          prizeFulfillmentStatus: participant.contactWorkflow.prizeFulfillmentStatus as string | null,
+          prizeDeliveredAt: participant.contactWorkflow.prizeDeliveredAt?.toISOString() ?? null,
+          contactNotes: participant.contactWorkflow.contactNotes,
+        }
+      : null,
+    contactAttempts: participant.contactAttempts.map((a) => ({
+      id: a.id,
+      attemptedAt: a.attemptedAt.toISOString(),
+      outcome: a.outcome as string,
+      note: a.note,
+      researcherName: a.researcher?.name ?? null,
+    })),
+
+    debrief: participant.debrief
+      ? {
+          explanationShown: participant.debrief.explanationShown,
+          permissionGiven: participant.debrief.permissionGiven,
+          debriefStatus: participant.debrief.debriefStatus as string,
+          debriefMethod: participant.debrief.debriefMethod as string | null,
+          debriefSentAt: participant.debrief.debriefSentAt?.toISOString() ?? null,
+          debriefNotes: participant.debrief.debriefNotes,
+        }
+      : null,
+
+    dataUsePermission: deriveDataUsePermission(participant.consent),
+    consentNotes: participant.consent?.notes ?? null,
+
+    interviewConsent: participant.interviewConsent
+      ? {
+          invited: participant.interviewConsent.invited,
+          invitedAt: participant.interviewConsent.invitedAt?.toISOString() ?? null,
+          consent: participant.interviewConsent.consent as string,
+          consentAt: participant.interviewConsent.consentAt?.toISOString() ?? null,
+          status: participant.interviewConsent.status as string,
+          preferredContactTime: participant.interviewConsent.preferredContactTime,
+          notes: participant.interviewConsent.notes,
+        }
+      : null,
+    interviews: participant.interviews.map((i) => ({
+      id: i.id,
+      interviewerName: i.interviewer?.name ?? null,
+      interviewMode: i.interviewMode as string | null,
+      status: i.status as string,
+      scheduledAt: i.scheduledAt?.toISOString() ?? null,
+      durationMinutes: i.durationMinutes,
+      summary: i.summary,
+      themes: i.themes,
+      researcherNotes: i.researcherNotes,
+      transcriptFileUrl: i.transcriptFileUrl,
+      recordingFileUrl: i.recordingFileUrl,
+    })),
+
+    eligibility: {
+      eligible: participant.researchEligibility?.eligible ?? true,
+      exclusionReason: participant.researchEligibility?.exclusionReason as string | null,
+      excludedAt: participant.researchEligibility?.excludedAt?.toISOString() ?? null,
+      excludedByName: participant.researchEligibility?.excludedByUser?.name ?? null,
+      reviewNotes: participant.researchEligibility?.reviewNotes ?? null,
+    },
+  };
+}
+
+export type ParticipantDetail = NonNullable<Awaited<ReturnType<typeof getParticipantDetail>>>;

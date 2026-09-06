@@ -1,75 +1,41 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckCircle2, MinusCircle, XCircle } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { EmptyState } from "@/components/common/empty-state";
-import { getExperimentById, getParticipantRows } from "@/lib/queries/research";
+import { Users, ArrowRight } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { getExperimentById } from "@/lib/queries/research";
 
-function Tick({ value }: { value: boolean | null }) {
-  if (value === null) return <MinusCircle className="size-4 text-muted-foreground/40" />;
-  return value ? (
-    <CheckCircle2 className="size-4 text-accent-green" />
-  ) : (
-    <XCircle className="size-4 text-muted-foreground/40" />
-  );
-}
-
-export default async function ParticipantsPage({
+/**
+ * The full participant journey/filter/detail experience now lives at the
+ * global Participants screen — this tab stays only as a scoped shortcut into
+ * it, rather than maintaining a second, narrower table in parallel.
+ */
+export default async function ExperimentParticipantsPage({
   params,
 }: PageProps<"/researcher/experiments/[id]/participants">) {
   const { id } = await params;
   const experiment = await getExperimentById(id);
   if (!experiment) notFound();
 
-  const rows = await getParticipantRows(id);
-
   return (
-    <div>
-      <p className="mb-4 rounded-lg border border-accent-cyan/25 bg-accent-cyan/10 p-3 text-xs text-accent-cyan">
-        Participants are identified only by anonymous code. Contact details are stored
-        separately, encrypted, and are never shown in this view.
-      </p>
-
-      {rows.length === 0 ? (
-        <EmptyState title="No participants yet" description="Participant activity will appear here once the tracking link is live." />
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Anonymous Code</TableHead>
-                <TableHead>Condition</TableHead>
-                <TableHead>Streamer</TableHead>
-                <TableHead>Consent</TableHead>
-                <TableHead className="text-center">Spun</TableHead>
-                <TableHead className="text-center">Submitted Contact</TableHead>
-                <TableHead className="text-center">Debriefed</TableHead>
-                <TableHead className="text-center">Research Permission</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.anonymousCode}>
-                  <TableCell className="font-mono text-xs">{r.anonymousCode}</TableCell>
-                  <TableCell className="text-sm">{r.conditionName}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{r.streamerName ?? "—"}</TableCell>
-                  <TableCell className="text-sm">{r.consentStatus.toLowerCase()}</TableCell>
-                  <TableCell className="text-center"><Tick value={r.spun} /></TableCell>
-                  <TableCell className="text-center"><Tick value={r.submittedContact} /></TableCell>
-                  <TableCell className="text-center"><Tick value={r.debriefed} /></TableCell>
-                  <TableCell className="text-center"><Tick value={r.permissionGiven} /></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+    <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border bg-secondary/20 px-6 py-14 text-center">
+      <span className="flex size-12 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+        <Users className="size-6" />
+      </span>
+      <div>
+        <p className="font-semibold">View this experiment&apos;s participants</p>
+        <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+          Full participant profiles — journey, responses, contact, debrief, interview, and
+          research-decision status — now live in one place, filterable by experiment.
+        </p>
+      </div>
+      <Link
+        href={`/researcher/participants?experimentId=${experiment.id}`}
+        className={cn(buttonVariants(), "bg-gradient-primary text-white hover:opacity-90")}
+      >
+        Open Participants for this experiment
+        <ArrowRight data-icon="inline-end" />
+      </Link>
     </div>
   );
 }
