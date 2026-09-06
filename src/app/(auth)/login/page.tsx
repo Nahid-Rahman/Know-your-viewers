@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { toast } from "sonner";
+import { CircleCheckIcon, Loader2Icon, TriangleAlertIcon } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -19,9 +18,11 @@ const loginSchema = z.object({
 
 type LoginValues = z.infer<typeof loginSchema>;
 
+type Status = "idle" | "submitting" | "success";
+
 export default function LoginPage() {
-  const router = useRouter();
-  const [submitting, setSubmitting] = useState(false);
+  const [status, setStatus] = useState<Status>("idle");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
@@ -29,21 +30,51 @@ export default function LoginPage() {
   });
 
   async function onSubmit(values: LoginValues) {
-    setSubmitting(true);
+    setStatus("submitting");
+    setErrorMessage(null);
     const result = await login(values);
-    setSubmitting(false);
 
     if ("error" in result) {
-      toast.error(result.error);
+      setStatus("idle");
+      setErrorMessage(result.error);
       return;
     }
-    router.push(result.role === "RESEARCHER" ? "/researcher/dashboard" : "/streamer/dashboard");
+
+    setStatus("success");
+    // Brief pause so the success state is actually visible before navigating away.
+    // A hard navigation (not router.push) so the dashboard's first render always
+    // picks up the just-set session cookie fresh from the server.
+    setTimeout(() => {
+      window.location.href = result.role === "RESEARCHER" ? "/researcher/dashboard" : "/streamer/dashboard";
+    }, 700);
+  }
+
+  if (status === "success") {
+    return (
+      <div className="glow-primary rounded-2xl border border-border bg-card p-7">
+        <div className="flex flex-col items-center py-6 text-center">
+          <span className="flex size-12 items-center justify-center rounded-full bg-accent-green/10 text-accent-green">
+            <CircleCheckIcon className="size-6" />
+          </span>
+          <h1 className="font-display mt-4 text-xl font-bold">Signed in</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Redirecting to your dashboard&hellip;</p>
+          <Loader2Icon className="mt-4 size-5 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="glow-primary rounded-2xl border border-border bg-card p-7">
       <h1 className="font-display text-xl font-bold">Sign in</h1>
       <p className="mt-1 text-sm text-muted-foreground">Access your researcher or streamer dashboard.</p>
+
+      {errorMessage && (
+        <div className="mt-4 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
+          <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
+          <p>{errorMessage}</p>
+        </div>
+      )}
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 space-y-4">
         <div>
@@ -60,8 +91,13 @@ export default function LoginPage() {
             <p className="mt-1 text-xs text-destructive">{form.formState.errors.password.message}</p>
           )}
         </div>
-        <Button type="submit" disabled={submitting} className="w-full bg-gradient-primary text-white hover:opacity-90">
-          {submitting ? "Signing in..." : "Sign in"}
+        <Button
+          type="submit"
+          disabled={status === "submitting"}
+          className="w-full bg-gradient-primary text-white hover:opacity-90"
+        >
+          {status === "submitting" && <Loader2Icon className="size-4 animate-spin" data-icon="inline-start" />}
+          {status === "submitting" ? "Signing in..." : "Sign in"}
         </Button>
       </form>
 
