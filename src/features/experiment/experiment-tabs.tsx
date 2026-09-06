@@ -9,6 +9,7 @@ const TABS = [
   { slug: "conditions", label: "Conditions" },
   { slug: "participants", label: "Participants" },
   { slug: "surveys", label: "Surveys" },
+  { slug: "streams", label: "Streams" },
   { slug: "links", label: "Tracking Links" },
   { slug: "analytics", label: "Analytics" },
 ];

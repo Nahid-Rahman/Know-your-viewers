@@ -10,7 +10,7 @@ import {
 import { EmptyState } from "@/components/common/empty-state";
 import { GenerateLinkButton } from "@/features/experiment/generate-link-button";
 import { TrackingLinkRow } from "@/features/experiment/tracking-link-row";
-import { getExperimentById, getStreamers, getTrackingLinks } from "@/lib/queries/research";
+import { getExperimentById, getStreamers, getStreamSessionOptions, getTrackingLinks } from "@/lib/queries/research";
 
 export default async function TrackingLinksPage({
   params,
@@ -19,14 +19,17 @@ export default async function TrackingLinksPage({
   const experiment = await getExperimentById(id);
   if (!experiment) notFound();
 
-  const links = await getTrackingLinks(id);
-  const allStreamers = await getStreamers();
+  const [links, allStreamers, streamSessions] = await Promise.all([
+    getTrackingLinks(id),
+    getStreamers(),
+    getStreamSessionOptions(id),
+  ]);
   const assignedStreamers = allStreamers.filter((s) => experiment.assignedStreamerIds.includes(s.id));
 
   return (
     <div>
       <div className="mb-4 flex justify-end">
-        <GenerateLinkButton experimentId={id} streamers={assignedStreamers} />
+        <GenerateLinkButton experimentId={id} streamers={assignedStreamers} streamSessions={streamSessions} />
       </div>
 
       {links.length === 0 ? (
@@ -42,6 +45,8 @@ export default async function TrackingLinksPage({
               <TableRow>
                 <TableHead>Code</TableHead>
                 <TableHead>Streamer</TableHead>
+                <TableHead>Entry Source</TableHead>
+                <TableHead>Stream Session</TableHead>
                 <TableHead>Visits</TableHead>
                 <TableHead>Conversions</TableHead>
                 <TableHead>Conversion Rate</TableHead>
@@ -50,7 +55,7 @@ export default async function TrackingLinksPage({
             </TableHeader>
             <TableBody>
               {links.map((link) => (
-                <TrackingLinkRow key={link.id} link={link} streamers={assignedStreamers} />
+                <TrackingLinkRow key={link.id} link={link} streamers={assignedStreamers} streamSessions={streamSessions} />
               ))}
             </TableBody>
           </Table>

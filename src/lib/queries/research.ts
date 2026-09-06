@@ -147,6 +147,8 @@ export async function getTrackingLinks(experimentId: string): Promise<TrackingLi
         id: link.id,
         experimentId: link.experimentId,
         streamerId: link.streamerId,
+        streamSessionId: link.streamSessionId,
+        entrySource: link.entrySource as EntrySourceValue,
         uniqueCode: link.uniqueCode,
         visits,
         conversions,
@@ -154,6 +156,81 @@ export async function getTrackingLinks(experimentId: string): Promise<TrackingLi
       };
     }),
   );
+}
+
+export type StreamSessionRow = {
+  id: string;
+  streamerId: string;
+  streamerName: string;
+  platform: string | null;
+  gameName: string | null;
+  streamTitle: string | null;
+  streamStartTime: string | null;
+  streamEndTime: string | null;
+  campaignStartTime: string | null;
+  campaignEndTime: string | null;
+  estimatedViewerCount: number | null;
+  qrDisplayed: boolean;
+  chatLinkPosted: boolean;
+  notes: string | null;
+  trackingLinkCount: number;
+  participantCount: number;
+  createdAt: string;
+};
+
+export async function getStreamSessions(experimentId: string): Promise<StreamSessionRow[]> {
+  const sessions = await prisma.streamSession.findMany({
+    where: { experimentId },
+    include: {
+      streamer: { select: { displayName: true } },
+      trackingLinks: { select: { id: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return Promise.all(
+    sessions.map(async (s) => {
+      const linkIds = s.trackingLinks.map((l) => l.id);
+      const participantCount = linkIds.length
+        ? await prisma.participant.count({ where: { trackingLinkId: { in: linkIds } } })
+        : 0;
+
+      return {
+        id: s.id,
+        streamerId: s.streamerId,
+        streamerName: s.streamer.displayName,
+        platform: s.platform,
+        gameName: s.gameName,
+        streamTitle: s.streamTitle,
+        streamStartTime: s.streamStartTime ? s.streamStartTime.toISOString() : null,
+        streamEndTime: s.streamEndTime ? s.streamEndTime.toISOString() : null,
+        campaignStartTime: s.campaignStartTime ? s.campaignStartTime.toISOString() : null,
+        campaignEndTime: s.campaignEndTime ? s.campaignEndTime.toISOString() : null,
+        estimatedViewerCount: s.estimatedViewerCount,
+        qrDisplayed: s.qrDisplayed,
+        chatLinkPosted: s.chatLinkPosted,
+        notes: s.notes,
+        trackingLinkCount: linkIds.length,
+        participantCount,
+        createdAt: toDateOnly(s.createdAt),
+      };
+    }),
+  );
+}
+
+/** Lightweight options list for the tracking-link create/edit selects. */
+export async function getStreamSessionOptions(
+  experimentId: string,
+): Promise<{ id: string; label: string }[]> {
+  const sessions = await prisma.streamSession.findMany({
+    where: { experimentId },
+    include: { streamer: { select: { displayName: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+  return sessions.map((s) => ({
+    id: s.id,
+    label: `${s.streamer.displayName} — ${s.streamTitle ?? "Untitled stream"}`,
+  }));
 }
 
 /** Streamers assigned to an experiment, for the participant-facing "which streamer are you watching" select. */

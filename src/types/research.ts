@@ -1,3 +1,5 @@
+import type { EntrySourceValue } from "@/lib/entry-source";
+
 export type Role = "RESEARCHER" | "STREAMER" | "PARTICIPANT";
 export type ExperimentStatus = "DRAFT" | "ACTIVE" | "COMPLETED" | "ARCHIVED";
 export type StreamerStatus = "PENDING" | "ACTIVE" | "INACTIVE";
@@ -48,6 +50,8 @@ export type TrackingLink = {
   id: string;
   experimentId: string;
   streamerId: string | null;
+  streamSessionId: string | null;
+  entrySource: EntrySourceValue;
   uniqueCode: string;
   visits: number;
   conversions: number;
