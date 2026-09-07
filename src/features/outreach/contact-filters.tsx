@@ -4,6 +4,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { FilterField } from "@/components/common/filter-field";
 
 const ANY = "any";
 
@@ -32,55 +33,66 @@ export function ContactFilters({ researchers }: { researchers: { id: string; nam
   const hasActiveFilters = [...searchParams.keys()].some((k) => k !== "page");
 
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3">
-      <Input
-        placeholder="Search by code or streamer..."
-        defaultValue={searchParams.get("q") ?? ""}
-        className="w-52"
-        onKeyDown={(e) => {
-          if (e.key === "Enter") setParam("q", e.currentTarget.value);
-        }}
-        onBlur={(e) => setParam("q", e.currentTarget.value)}
-      />
+    <div className="mb-4 rounded-xl border border-border bg-card p-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <FilterField label="Search" className="col-span-2 sm:col-span-1">
+          <Input
+            placeholder="Code or streamer name"
+            defaultValue={searchParams.get("q") ?? ""}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") setParam("q", e.currentTarget.value);
+            }}
+            onBlur={(e) => setParam("q", e.currentTarget.value)}
+          />
+        </FilterField>
 
-      <Select value={searchParams.get("contactStatus") ?? ANY} onValueChange={(v) => setParam("contactStatus", v ?? ANY)}>
-        <SelectTrigger className="w-44"><SelectValue>{(v: string) => (v === ANY ? "Any Status" : STATUS_OPTIONS.find((o) => o.value === v)?.label ?? v)}</SelectValue></SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ANY}>Any Status</SelectItem>
-          {STATUS_OPTIONS.map((o) => (
-            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        <FilterField label="Contact Status">
+          <Select value={searchParams.get("contactStatus") ?? ANY} onValueChange={(v) => setParam("contactStatus", v ?? ANY)}>
+            <SelectTrigger className="w-full"><SelectValue>{(v: string) => (v === ANY ? "Any Status" : STATUS_OPTIONS.find((o) => o.value === v)?.label ?? v)}</SelectValue></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ANY}>Any Status</SelectItem>
+              {STATUS_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FilterField>
 
-      <Select
-        value={searchParams.get("researcherAssignedId") ?? ANY}
-        onValueChange={(v) => setParam("researcherAssignedId", v ?? ANY)}
-      >
-        <SelectTrigger className="w-40"><SelectValue>{(v: string) => (v === ANY ? "Any Researcher" : researchers.find((r) => r.id === v)?.name ?? v)}</SelectValue></SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ANY}>Any Researcher</SelectItem>
-          {researchers.map((r) => (
-            <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        <FilterField label="Assigned Researcher">
+          <Select
+            value={searchParams.get("researcherAssignedId") ?? ANY}
+            onValueChange={(v) => setParam("researcherAssignedId", v ?? ANY)}
+          >
+            <SelectTrigger className="w-full"><SelectValue>{(v: string) => (v === ANY ? "Any Researcher" : researchers.find((r) => r.id === v)?.name ?? v)}</SelectValue></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ANY}>Any Researcher</SelectItem>
+              {researchers.map((r) => (
+                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FilterField>
 
-      <Select
-        value={searchParams.get("overdueFollowup") ?? ANY}
-        onValueChange={(v) => setParam("overdueFollowup", v ?? ANY)}
-      >
-        <SelectTrigger className="w-44"><SelectValue>{(v: string) => (v === ANY ? "All Follow-ups" : "Overdue Follow-up")}</SelectValue></SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ANY}>All Follow-ups</SelectItem>
-          <SelectItem value="true">Overdue Follow-up</SelectItem>
-        </SelectContent>
-      </Select>
+        <FilterField label="Next Follow-up">
+          <Select
+            value={searchParams.get("overdueFollowup") ?? ANY}
+            onValueChange={(v) => setParam("overdueFollowup", v ?? ANY)}
+          >
+            <SelectTrigger className="w-full"><SelectValue>{(v: string) => (v === ANY ? "All Follow-ups" : "Overdue Follow-up")}</SelectValue></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ANY}>All Follow-ups</SelectItem>
+              <SelectItem value="true">Overdue Follow-up</SelectItem>
+            </SelectContent>
+          </Select>
+        </FilterField>
+      </div>
 
       {hasActiveFilters && (
-        <Button variant="ghost" size="sm" onClick={() => router.push(pathname)}>
-          Reset filters
-        </Button>
+        <div className="mt-3 flex justify-end">
+          <Button variant="ghost" size="sm" onClick={() => router.push(pathname)}>
+            Reset filters
+          </Button>
+        </div>
       )}
     </div>
   );

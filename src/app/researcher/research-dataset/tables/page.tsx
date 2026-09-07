@@ -32,6 +32,7 @@ export default async function DataTablesPage({
 
   const { columns, rows, total } = await getDataTable(tableKey, page);
   const totalPages = Math.max(Math.ceil(total / DATA_TABLE_PAGE_SIZE), 1);
+  const activeOption = DATA_TABLE_OPTIONS.find((o) => o.key === tableKey);
 
   const buildPageHref = (p: number) => {
     const params = new URLSearchParams({ table: tableKey, page: String(p) });
@@ -40,10 +41,17 @@ export default async function DataTablesPage({
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <DataTableSelect current={tableKey} />
         <p className="text-sm text-muted-foreground">{total.toLocaleString("en-US")} total rows</p>
       </div>
+
+      {activeOption && (
+        <div className="mb-4 rounded-lg border border-border bg-secondary/30 px-3 py-2.5 text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">What to analyze here: </span>
+          {activeOption.description}
+        </div>
+      )}
 
       {rows.length === 0 ? (
         <EmptyState title="No rows yet" description="This table doesn't have any data yet." />
