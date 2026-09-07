@@ -50,3 +50,6 @@ Thumbs.db
 
 .vercel
 .env*
+
+# database backups (may contain research data — never commit)
+/backups/
