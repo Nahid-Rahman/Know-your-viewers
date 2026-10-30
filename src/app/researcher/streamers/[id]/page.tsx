@@ -1,3 +1,4 @@
+import { researcherScope } from "@/lib/study/researcher";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
@@ -16,7 +17,7 @@ export default async function StreamerDetailPage({
   const streamer = await getStreamerById(id);
   if (!streamer) notFound();
 
-  const allExperiments = await getExperiments();
+  const allExperiments = await getExperiments({ ids: (await researcherScope()).scope });
   const experiments = allExperiments.filter((e) => e.assignedStreamerIds.includes(id));
 
   return (

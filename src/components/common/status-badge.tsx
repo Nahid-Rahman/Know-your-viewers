@@ -35,6 +35,21 @@ const STATUS_CLASSES: Record<string, string> = {
 
   // Research eligibility (not a DB enum value — passed in directly)
   ELIGIBLE: "bg-accent-green/10 text-accent-green border-accent-green/30",
+  // Revised study flow
+  CLOSED: "bg-muted text-muted-foreground border-border",
+  TEST: "bg-amber-400/10 text-amber-300 border-amber-400/30",
+  LIVE: "bg-accent-green/10 text-accent-green border-accent-green/30",
+  APPROVED: "bg-accent-green/10 text-accent-green border-accent-green/30",
+  CANONICAL: "bg-accent-green/10 text-accent-green border-accent-green/30",
+  DUPLICATE: "bg-amber-400/10 text-amber-300 border-amber-400/30",
+  ATTEMPTING: "bg-accent-violet/10 text-accent-violet border-accent-violet/30",
+  REACHED: "bg-accent-cyan/10 text-accent-cyan border-accent-cyan/30",
+  DECLINED_INTERVIEW: "bg-destructive/10 text-destructive border-destructive/30",
+  PAID: "bg-accent-green/10 text-accent-green border-accent-green/30",
+  FAILED: "bg-destructive/10 text-destructive border-destructive/30",
+  FINALIZED: "bg-accent-green/10 text-accent-green border-accent-green/30",
+  VOIDED: "bg-muted text-muted-foreground border-border",
+  WINNER: "bg-accent-violet/10 text-accent-violet border-accent-violet/30",
   EXCLUDED: "bg-destructive/10 text-destructive border-destructive/30",
   WITHDRAWN: "bg-destructive/10 text-destructive border-destructive/30",
 

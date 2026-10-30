@@ -1,14 +1,14 @@
+import { researcherScope } from "@/lib/study/researcher";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatTile } from "@/components/common/stat-tile";
-import { requireRoleOrRedirect } from "@/lib/auth";
 import { getResearchDatasetSummary } from "@/lib/queries/research";
 import { ResearchDatasetTabs } from "@/features/research-dataset/research-dataset-tabs";
 
 export default async function ResearchDatasetLayout({
   children,
 }: LayoutProps<"/researcher/research-dataset">) {
-  await requireRoleOrRedirect("RESEARCHER");
-  const summary = await getResearchDatasetSummary();
+  const { scope } = await researcherScope();
+  const summary = await getResearchDatasetSummary(scope);
 
   return (
     <div>

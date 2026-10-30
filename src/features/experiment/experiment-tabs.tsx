@@ -4,14 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
+// Revised study flow first; the factorial-condition tabs remain for legacy records.
 const TABS = [
   { slug: "", label: "Overview" },
-  { slug: "conditions", label: "Conditions" },
-  { slug: "participants", label: "Participants" },
-  { slug: "surveys", label: "Surveys" },
-  { slug: "streams", label: "Streams" },
+  { slug: "streams", label: "Sessions" },
+  { slug: "policy", label: "Decisions & Access" },
+  { slug: "draw", label: "Draw & Payouts" },
+  { slug: "comparison", label: "A/B Comparison" },
   { slug: "links", label: "Tracking Links" },
-  { slug: "analytics", label: "Analytics" },
+  { slug: "participants", label: "Legacy Participants" },
+  { slug: "conditions", label: "Legacy Conditions" },
+  { slug: "surveys", label: "Legacy Surveys" },
+  { slug: "analytics", label: "Legacy Analytics" },
 ];
 
 export function ExperimentTabs({ experimentId }: { experimentId: string }) {
@@ -21,7 +25,7 @@ export function ExperimentTabs({ experimentId }: { experimentId: string }) {
     <div className="mb-6 flex gap-1 overflow-x-auto border-b border-border">
       {TABS.map((tab) => {
         const href = `/researcher/experiments/${experimentId}${tab.slug ? `/${tab.slug}` : ""}`;
-        const active = pathname === href;
+        const active = tab.slug ? pathname === href || pathname.startsWith(`${href}/`) : pathname === href;
         return (
           <Link
             key={tab.slug}

@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireRole, AuthError } from "@/lib/auth";
+import { AuthError } from "@/lib/auth";
+import { requireLegacyParticipantAccess } from "@/lib/study/legacy-access";
 import type { ExclusionReason } from "@/generated/prisma/enums";
 
 function revalidateEligibility(participantId: string) {
@@ -24,7 +25,7 @@ export async function setEligibility(
 ): Promise<{ error: string } | { ok: true }> {
   let researcher;
   try {
-    researcher = await requireRole("RESEARCHER");
+    researcher = await requireLegacyParticipantAccess(participantId);
   } catch (err) {
     if (err instanceof AuthError) return { error: err.message };
     throw err;

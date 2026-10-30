@@ -99,7 +99,16 @@ export async function deleteExperiment(experimentId: string): Promise<{ error: s
     return { error: "Experiment not found." };
   }
 
-  // Cascades conditions/participants/responses/events/tracking-links per schema.
+  // Experiments with any study records are archived, never deleted — the
+  // schema would otherwise cascade away participants and their data.
+  const [participants, sessions, submissions] = await Promise.all([
+    prisma.participant.count({ where: { experimentId } }),
+    prisma.streamSession.count({ where: { experimentId } }),
+    prisma.submission.count({ where: { experimentId } }),
+  ]);
+  if (participants || sessions || submissions) {
+    return { error: "This experiment has study records or sessions. Set its status to Archived instead of deleting it." };
+  }
   await prisma.experiment.delete({ where: { id: experimentId } });
   revalidatePath("/researcher/experiments");
   return { ok: true };

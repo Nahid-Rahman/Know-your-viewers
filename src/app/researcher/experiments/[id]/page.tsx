@@ -1,3 +1,4 @@
+import { requireExperimentPage } from "@/lib/study/researcher";
 import { notFound } from "next/navigation";
 import { CalendarDays, ShieldAlert, ShieldCheck, Users } from "lucide-react";
 import { StatCard } from "@/components/common/stat-card";
@@ -13,6 +14,7 @@ export default async function ExperimentOverviewPage({
   params,
 }: PageProps<"/researcher/experiments/[id]">) {
   const { id } = await params;
+  await requireExperimentPage(id);
   const experiment = await getExperimentById(id);
   if (!experiment) notFound();
 

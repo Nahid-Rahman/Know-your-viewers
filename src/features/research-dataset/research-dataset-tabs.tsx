@@ -5,8 +5,9 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const TABS = [
-  { slug: "exports", label: "Exports" },
-  { slug: "tables", label: "Browse Tables" },
+  { slug: "study-exports", label: "Study Exports" },
+  { slug: "exports", label: "Legacy Exports" },
+  { slug: "tables", label: "Legacy Tables" },
 ];
 
 export function ResearchDatasetTabs() {

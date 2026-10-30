@@ -53,3 +53,6 @@ Thumbs.db
 
 # database backups (may contain research data — never commit)
 /backups/
+
+# disposable local development/test database and key
+/.localdb/

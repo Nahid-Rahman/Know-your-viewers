@@ -1,3 +1,4 @@
+import { requireExperimentPage } from "@/lib/study/researcher";
 import { notFound } from "next/navigation";
 import { BarChartCard } from "@/components/charts/bar-chart-card";
 import { LineChartCard } from "@/components/charts/line-chart-card";
@@ -8,6 +9,7 @@ export default async function AnalyticsPage({
   params,
 }: PageProps<"/researcher/experiments/[id]/analytics">) {
   const { id } = await params;
+  await requireExperimentPage(id);
   const experiment = await getExperimentById(id);
   if (!experiment) notFound();
 

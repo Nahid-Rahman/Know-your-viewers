@@ -1,3 +1,4 @@
+import { researcherScope } from "@/lib/study/researcher";
 import Link from "next/link";
 import { FlaskConical } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
@@ -18,7 +19,7 @@ import { getExperiments } from "@/lib/queries/research";
 export const metadata = { title: "Experiments | LiveDrop Arena" };
 
 export default async function ExperimentsPage() {
-  const experiments = await getExperiments();
+  const experiments = await getExperiments({ ids: (await researcherScope()).scope });
 
   return (
     <div>

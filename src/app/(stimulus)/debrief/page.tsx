@@ -20,7 +20,7 @@ export default function DebriefPage() {
   const [content, setContent] = useState<DebriefContent>(DEFAULT_SITE_CONTENT.debriefContent);
 
   useEffect(() => {
-    void logEngagementEvent("PAGE_VIEW");
+    void logEngagementEvent("debrief");
     void getPublicSiteContent().then((c) => {
       if (c) setContent(c.debriefContent);
     });

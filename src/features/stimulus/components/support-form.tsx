@@ -24,7 +24,6 @@ const ISSUE_TYPES = [
 const supportSchema = z.object({
   emailOrPhone: z.string().min(3, "Enter the email or phone number you submitted."),
   responseCode: z.string().optional(),
-  streamNickname: z.string().optional(),
   issueType: z.string().min(1, "Select an issue type."),
   message: z.string().min(5, "Tell us a little about the issue."),
 });
@@ -39,7 +38,6 @@ export function SupportForm() {
     defaultValues: {
       emailOrPhone: "",
       responseCode: "",
-      streamNickname: "",
       issueType: "",
       message: "",
     },
@@ -70,12 +68,7 @@ export function SupportForm() {
 
       <div>
         <LightFieldLabel htmlFor="support-code">Response Code</LightFieldLabel>
-        <LightInput id="support-code" placeholder="LDA-8K42" {...form.register("responseCode")} />
-      </div>
-
-      <div>
-        <LightFieldLabel htmlFor="support-nickname">Stream Nickname</LightFieldLabel>
-        <LightInput id="support-nickname" placeholder="RafiqPlaysBD" {...form.register("streamNickname")} />
+        <LightInput id="support-code" placeholder="LD-XXXX-XXXX" {...form.register("responseCode")} />
       </div>
 
       <div>

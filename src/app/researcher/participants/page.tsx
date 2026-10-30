@@ -1,3 +1,4 @@
+import { researcherScope } from "@/lib/study/researcher";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/common/empty-state";
@@ -12,7 +13,6 @@ import {
 } from "@/components/ui/table";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { requireRoleOrRedirect } from "@/lib/auth";
 import {
   getParticipantRows,
   getStreamers,
@@ -30,11 +30,12 @@ const PAGE_SIZE = 25;
 export default async function ParticipantsPage({
   searchParams,
 }: PageProps<"/researcher/participants">) {
-  await requireRoleOrRedirect("RESEARCHER");
+  const { scope } = await researcherScope();
   const sp = await searchParams;
   const get = (key: string) => (typeof sp[key] === "string" ? (sp[key] as string) : undefined);
 
   const filters: ParticipantListFilters = {
+    scope,
     q: get("q"),
     experimentId: get("experimentId"),
     streamerId: get("streamerId"),

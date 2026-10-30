@@ -1,3 +1,4 @@
+import { researcherScope } from "@/lib/study/researcher";
 import Link from "next/link";
 import { EmptyState } from "@/components/common/empty-state";
 import {
@@ -24,7 +25,9 @@ export default async function DebriefQueuePage({
   const sp = await searchParams;
   const get = (key: string) => (typeof sp[key] === "string" ? (sp[key] as string) : undefined);
 
+  const { scope } = await researcherScope();
   const filters: DebriefQueueFilters = {
+    scope,
     q: get("q"),
     debriefStatus: get("debriefStatus") as DebriefStatus | undefined,
     page: get("page") ? Number(get("page")) : 1,

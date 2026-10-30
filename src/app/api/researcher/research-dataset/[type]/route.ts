@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { requireRole, AuthError } from "@/lib/auth";
+import { AuthError } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { audit } from "@/lib/study/access";
+import { researcherScopeOrThrow } from "@/lib/study/researcher";
 import { decryptContact } from "@/lib/crypto";
 import { toCsv } from "@/lib/csv";
 import {
@@ -13,10 +16,10 @@ import {
 const DATASET_TYPES = ["behavioral", "responses", "events", "interviews", "contacts"] as const;
 type DatasetType = (typeof DATASET_TYPES)[number];
 
-async function buildCsv(type: DatasetType): Promise<{ filename: string; csv: string }> {
+async function buildCsv(type: DatasetType, scope: string[]): Promise<{ filename: string; csv: string }> {
   switch (type) {
     case "behavioral": {
-      const rows = await getBehavioralDatasetRows();
+      const rows = await getBehavioralDatasetRows(scope);
       return {
         filename: "research-dataset-behavioral.csv",
         csv: toCsv(
@@ -56,7 +59,7 @@ async function buildCsv(type: DatasetType): Promise<{ filename: string; csv: str
       };
     }
     case "responses": {
-      const rows = await getSurveyResponseExportRows();
+      const rows = await getSurveyResponseExportRows(scope);
       return {
         filename: "research-dataset-responses.csv",
         csv: toCsv(
@@ -66,7 +69,7 @@ async function buildCsv(type: DatasetType): Promise<{ filename: string; csv: str
       };
     }
     case "events": {
-      const rows = await getEventExportRows();
+      const rows = await getEventExportRows(scope);
       return {
         filename: "research-dataset-events.csv",
         csv: toCsv(
@@ -76,7 +79,7 @@ async function buildCsv(type: DatasetType): Promise<{ filename: string; csv: str
       };
     }
     case "interviews": {
-      const rows = await getInterviewStatusExportRows();
+      const rows = await getInterviewStatusExportRows(scope);
       return {
         filename: "research-dataset-interviews.csv",
         csv: toCsv(
@@ -106,7 +109,7 @@ async function buildCsv(type: DatasetType): Promise<{ filename: string; csv: str
       };
     }
     case "contacts": {
-      const participants = await getContactExportSourceRows();
+      const participants = await getContactExportSourceRows(scope);
       const rows = participants.map((p) => {
         const contact = p.contact!;
         const primary = decryptContact(contact.encryptedValue);
@@ -135,19 +138,29 @@ async function buildCsv(type: DatasetType): Promise<{ filename: string; csv: str
 }
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/researcher/research-dataset/[type]">) {
-  try {
-    await requireRole("RESEARCHER");
-  } catch (err) {
-    if (err instanceof AuthError) return NextResponse.json({ error: err.message }, { status: 401 });
-    throw err;
-  }
-
   const { type } = await ctx.params;
   if (!DATASET_TYPES.includes(type as DatasetType)) {
     return NextResponse.json({ error: "Unknown dataset type." }, { status: 400 });
   }
 
-  const { filename, csv } = await buildCsv(type as DatasetType);
+  // Legacy exports are limited to the researcher's own experiments; the
+  // decrypted contacts export additionally needs contact-level access.
+  let user, scope;
+  try {
+    ({ user, scope } = await researcherScopeOrThrow(type === "contacts" ? "contact" : "read"));
+  } catch (err) {
+    if (err instanceof AuthError) return NextResponse.json({ error: err.message }, { status: 401 });
+    throw err;
+  }
+
+  const { filename, csv } = await buildCsv(type as DatasetType, scope);
+  await audit(prisma, {
+    actorId: user.id,
+    action: type === "contacts" ? "SENSITIVE_EXPORT" : "EXPORT",
+    entityType: "LegacyDataset",
+    entityId: type,
+    detail: { type, legacy: true, experiments: scope.length },
+  });
   return new NextResponse(csv, {
     headers: {
       "Content-Type": "text/csv",

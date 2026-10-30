@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireRole, AuthError } from "@/lib/auth";
+import { AuthError } from "@/lib/auth";
+import { requireLegacyParticipantAccess, auditLegacyReveal } from "@/lib/study/legacy-access";
 import { decryptContact } from "@/lib/crypto";
 import type { ContactStatus, ContactOutcome, PrizeFulfillmentStatus } from "@/generated/prisma/enums";
 
@@ -16,7 +17,7 @@ export async function updateContactStatus(
   contactStatus: ContactStatus,
 ): Promise<{ error: string } | { ok: true }> {
   try {
-    await requireRole("RESEARCHER");
+    await requireLegacyParticipantAccess(participantId);
   } catch (err) {
     if (err instanceof AuthError) return { error: err.message };
     throw err;
@@ -36,7 +37,7 @@ export async function assignResearcher(
   researcherAssignedId: string | null,
 ): Promise<{ error: string } | { ok: true }> {
   try {
-    await requireRole("RESEARCHER");
+    await requireLegacyParticipantAccess(participantId);
   } catch (err) {
     if (err instanceof AuthError) return { error: err.message };
     throw err;
@@ -56,7 +57,7 @@ export async function setNextFollowup(
   nextFollowupAt: string | null,
 ): Promise<{ error: string } | { ok: true }> {
   try {
-    await requireRole("RESEARCHER");
+    await requireLegacyParticipantAccess(participantId);
   } catch (err) {
     if (err instanceof AuthError) return { error: err.message };
     throw err;
@@ -80,7 +81,7 @@ export async function setPrizeFulfillment(
   prizeFulfillmentStatus: PrizeFulfillmentStatus,
 ): Promise<{ error: string } | { ok: true }> {
   try {
-    await requireRole("RESEARCHER");
+    await requireLegacyParticipantAccess(participantId);
   } catch (err) {
     if (err instanceof AuthError) return { error: err.message };
     throw err;
@@ -101,7 +102,7 @@ export async function updateContactNotes(
   contactNotes: string,
 ): Promise<{ error: string } | { ok: true }> {
   try {
-    await requireRole("RESEARCHER");
+    await requireLegacyParticipantAccess(participantId);
   } catch (err) {
     if (err instanceof AuthError) return { error: err.message };
     throw err;
@@ -128,7 +129,7 @@ export async function logContactAttempt(
 ): Promise<{ error: string } | { ok: true }> {
   let researcher;
   try {
-    researcher = await requireRole("RESEARCHER");
+    researcher = await requireLegacyParticipantAccess(participantId);
   } catch (err) {
     if (err instanceof AuthError) return { error: err.message };
     throw err;
@@ -153,8 +154,9 @@ export async function logContactAttempt(
 export async function revealContact(
   participantId: string,
 ): Promise<{ error: string } | { email: string | null; phone: string | null }> {
+  let researcher;
   try {
-    await requireRole("RESEARCHER");
+    researcher = await requireLegacyParticipantAccess(participantId, "contact");
   } catch (err) {
     if (err instanceof AuthError) return { error: err.message };
     throw err;
@@ -162,6 +164,7 @@ export async function revealContact(
 
   const contact = await prisma.participantContact.findUnique({ where: { participantId } });
   if (!contact) return { error: "No contact info on file for this participant." };
+  await auditLegacyReveal(researcher.id, participantId);
 
   // encryptedValue holds the email when one was given, otherwise the phone
   // (see the ParticipantContact model comment). Classify by the decrypted

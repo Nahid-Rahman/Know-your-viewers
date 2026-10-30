@@ -39,6 +39,19 @@ model User {
   interviewsConducted Interview[]
   exclusionsMade      ResearchEligibility[]
 
+  collaborations       ExperimentCollaborator[]
+  auditEntries         AuditLog[]
+  policyDecisions      StudyPolicyDecision[]
+  sessionConfigs       SessionConfig[]
+  permissionRecords    DataUsePermission[]
+  submissionFollowUps  SubmissionFollowUp[]
+  submissionAttempts   SubmissionContactAttempt[]
+  submissionInterviews SubmissionInterview[]
+  draws                RewardDraw[]
+  payoutUpdates        DrawWinner[]
+  platformMetrics      PlatformMetric[]
+  sessionAnnotations   SessionAnnotation[]
+
   @@map("users")
 }
 
@@ -71,12 +84,25 @@ model Experiment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Revised (session-configured) flow: duplicates are matched by normalized
+  // phone within this whole campaign. Kept as an explicit column rather than
+  // an implicit global rule so a future study can choose differently.
+  duplicateScope DuplicateScope @default(CAMPAIGN)
+
   streamers      ExperimentStreamer[]
   conditions     Condition[]
   participants   Participant[]
   surveys        Survey[]
   trackingLinks  TrackingLink[]
   streamSessions StreamSession[]
+
+  collaborators   ExperimentCollaborator[]
+  policyDecisions StudyPolicyDecision[]
+  visits          Visit[]
+  submissions     Submission[]
+  phoneEntries    CampaignPhoneEntry[]
+  studyEvents     StudyEvent[]
+  draws           RewardDraw[]
 
   @@index([researcherId])
   @@map("experiments")
@@ -100,13 +126,13 @@ model ExperimentStreamer {
 // platform into a factorial experiment rather than a single fixed page —
 // each toggle corresponds 1:1 to a persuasion element in the stimulus UI.
 model Condition {
-  id                     String  @id @default(uuid())
+  id                     String             @id @default(uuid())
   experimentId           String
   name                   String
-  urgencyEnabled         Boolean @default(false)
-  socialProofEnabled     Boolean @default(false)
-  authorityBadgesEnabled Boolean @default(false)
-  rewardRarity           Rarity  @default(COMMON)
+  urgencyEnabled         Boolean            @default(false)
+  socialProofEnabled     Boolean            @default(false)
+  authorityBadgesEnabled Boolean            @default(false)
+  rewardRarity           Rarity             @default(COMMON)
   contactRequirement     ContactRequirement @default(OPTIONAL)
 
   experiment   Experiment    @relation(fields: [experimentId], references: [id], onDelete: Cascade)
@@ -147,12 +173,15 @@ model Streamer {
   platform    String
   channelUrl  String
   category    String
+  // Researcher-approved image shown on the streamer-branded homepage. A
+  // session's config snapshot copies it, so later edits don't rewrite history.
+  imageUrl    String?
   status      StreamerStatus @default(PENDING)
   createdAt   DateTime       @default(now())
 
-  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  experiments   ExperimentStreamer[]
-  trackingLinks TrackingLink[]
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  experiments    ExperimentStreamer[]
+  trackingLinks  TrackingLink[]
   // Self-reported "which streamer are you watching" on Participant, not the
   // tracking-link click-through relation above.
   viewers        Participant[]
@@ -225,23 +254,23 @@ model Participant {
 // below) can delete this row alone, without touching behavioural data used
 // in aggregate analysis.
 model ParticipantContact {
-  id              String   @id @default(uuid())
-  participantId   String   @unique
+  id                  String   @id @default(uuid())
+  participantId       String   @unique
   // Encrypted at rest with AES-256-GCM (see src/lib/crypto.ts). Never
   // decrypted for display in the researcher dashboard — only for an
   // outbound contact action a human researcher explicitly triggers.
   // Both may be set — some reward types (e.g. bKash) can only be paid out
   // by phone, so email alone isn't always enough for follow-up.
-  encryptedValue  String
-  encryptedPhone  String?
+  encryptedValue      String
+  encryptedPhone      String?
   // Deterministic HMAC of the normalized email (see src/lib/crypto.ts) —
   // never the plaintext, but lets submitEntry look up "has this email
   // already submitted for this streamer" without decrypting anything.
-  emailHash       String?
-  streamNickname  String?
-  favouriteGameType String?
+  emailHash           String?
+  streamNickname      String?
+  favouriteGameType   String?
   livestreamFrequency String?
-  createdAt       DateTime @default(now())
+  createdAt           DateTime @default(now())
 
   participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
 
@@ -250,15 +279,15 @@ model ParticipantContact {
 }
 
 model Consent {
-  id             String        @id @default(uuid())
-  participantId  String        @unique
+  id             String    @id @default(uuid())
+  participantId  String    @unique
   consentGiven   Boolean
   consentVersion String
-  timestamp      DateTime      @default(now())
+  timestamp      DateTime  @default(now())
   // Set independently of the original consentGiven value — e.g. a
   // researcher recording a later phone-call withdrawal, unrelated to the
   // participant's own on-page debrief answer.
-  withdrawn      Boolean       @default(false)
+  withdrawn      Boolean   @default(false)
   withdrawnAt    DateTime?
   notes          String?
 
@@ -271,21 +300,21 @@ model Consent {
 // deception. `permissionGiven = false` triggers deletion of
 // ParticipantContact and exclusion of this participant from analysis.
 model Debrief {
-  id               String   @id @default(uuid())
-  participantId    String   @unique
-  explanationShown Boolean  @default(true)
+  id               String         @id @default(uuid())
+  participantId    String         @unique
+  explanationShown Boolean        @default(true)
   permissionGiven  Boolean?
-  timestamp        DateTime @default(now())
+  timestamp        DateTime       @default(now())
   // Researcher-side human-follow-up debrief workflow (phone/WhatsApp/SMS) —
   // separate from the automatic on-page explanation above. submitDebrief
   // auto-sets this to ACKNOWLEDGED/DECLINED the moment a participant
   // completes the on-page flow themselves; the other states are reached
   // only through the researcher's own Debrief-queue actions, for
   // participants who never got that far on their own.
-  debriefStatus DebriefStatus  @default(PENDING)
-  debriefMethod DebriefMethod?
-  debriefSentAt DateTime?
-  debriefNotes  String?
+  debriefStatus    DebriefStatus  @default(PENDING)
+  debriefMethod    DebriefMethod?
+  debriefSentAt    DateTime?
+  debriefNotes     String?
 
   participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
 
@@ -389,9 +418,35 @@ model StreamSession {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
+  // --- Revised study flow --------------------------------------------------
+  // streamStartTime/streamEndTime above are the *planned* times; the actual
+  // times below are recorded by the researcher and drive the entry deadline.
+  sessionType     StreamSessionType   @default(STUDY)
+  status          StreamSessionStatus @default(DRAFT)
+  collectionMode  CollectionMode      @default(TEST)
+  actualStartAt   DateTime?
+  actualEndAt     DateTime?
+  // Always actualEndAt + 2h, written together with actualEndAt; null until
+  // the actual end is recorded (no invented deadline).
+  entryDeadlineAt DateTime?
+  // Manual "close entries now" — takes effect even before the deadline.
+  entriesClosedAt DateTime?
+  activatedAt     DateTime?
+  currentConfigId String?             @unique
+
   experiment    Experiment     @relation(fields: [experimentId], references: [id], onDelete: Cascade)
   streamer      Streamer       @relation(fields: [streamerId], references: [id], onDelete: Cascade)
   trackingLinks TrackingLink[]
+
+  currentConfig   SessionConfig?        @relation("CurrentSessionConfig", fields: [currentConfigId], references: [id])
+  configs         SessionConfig[]       @relation("SessionConfigs")
+  visits          Visit[]
+  submissions     Submission[]
+  studyEvents     StudyEvent[]
+  spins           SpinOutcome[]
+  annotations     SessionAnnotation[]
+  platformMetrics PlatformMetric[]
+  timingChanges   SessionTimingChange[]
 
   @@index([experimentId])
   @@index([streamerId])
@@ -421,6 +476,8 @@ model TrackingLink {
   streamer      Streamer?      @relation(fields: [streamerId], references: [id])
   streamSession StreamSession? @relation(fields: [streamSessionId], references: [id])
   participants  Participant[]
+  visits        Visit[]
+  submissions   Submission[]
 
   @@index([experimentId])
   @@index([streamSessionId])
@@ -505,14 +562,21 @@ model SiteContent {
 // page. Kept separate from ParticipantContact — support messages are
 // operational, not behavioural research data.
 model SupportRequest {
-  id                String       @id @default(uuid())
+  id                String    @id @default(uuid())
   participantId     String?
-  emailOrPhone      String
+  // Legacy plaintext columns — new requests leave these null and use the
+  // encrypted* columns below; scripts/encrypt-support-requests.ts moves
+  // existing rows over.
+  emailOrPhone      String?
   responseCode      String?
   streamNickname    String?
   issueType         String
-  message           String
-  createdAt         DateTime     @default(now())
+  message           String?
+  encryptedContact  String?
+  encryptedMessage  String?
+  encryptedNickname String?
+  purgedAt          DateTime?
+  createdAt         DateTime  @default(now())
 
   participant Participant? @relation(fields: [participantId], references: [id], onDelete: SetNull)
 
@@ -702,4 +766,679 @@ model ResearchEligibility {
   excludedByUser User?       @relation(fields: [excludedByUserId], references: [id])
 
   @@map("research_eligibility")
+}
+
+// ===========================================================================
+// Revised study flow (2026-10). One consistent experience per stream session,
+// separate visitor / visit / submission records, campaign-wide duplicate
+// classification, server-authoritative spin, and a separate reward draw.
+// Legacy Participant-based records above are kept untouched for history.
+// ===========================================================================
+
+enum DuplicateScope {
+  CAMPAIGN
+}
+
+enum StreamSessionType {
+  // Condition A: normal livestream, no study link — platform metrics only.
+  NORMAL_BASELINE
+  // Condition B: study livestream with the website link in the description.
+  STUDY
+}
+
+enum StreamSessionStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}
+
+// TEST sessions accept synthetic submissions while study policy is still
+// pending; LIVE requires every collection/reward policy to be approved.
+enum CollectionMode {
+  TEST
+  LIVE
+}
+
+enum CollaboratorRole {
+  RESEARCHER
+  VIEWER
+}
+
+// Researchers other than the owner who may access an experiment. VIEWER can
+// read aggregate and pseudonymous data but cannot reveal or export contacts.
+model ExperimentCollaborator {
+  id           String           @id @default(uuid())
+  experimentId String
+  userId       String
+  role         CollaboratorRole @default(VIEWER)
+  createdAt    DateTime         @default(now())
+
+  experiment Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([experimentId, userId])
+  @@map("experiment_collaborators")
+}
+
+// ---------------------------------------------------------------------------
+// Pending supervisor/ethics decisions, made explicit. A LIVE session cannot
+// be activated (and a live draw cannot run) until the required keys are
+// APPROVED. Every change is appended to the audit log.
+// ---------------------------------------------------------------------------
+
+enum StudyPolicyKey {
+  COLLECTION_NOTICE
+  PARTIAL_DISCLOSURE
+  UNDER18_COLLECTION
+  UNDER18_CONTACT_AND_REWARD
+  RETENTION
+  REWARD_PRESENTATION
+  WINNER_COUNT
+  DRAW_INTERVIEW_ORDER
+  UNREACHABLE_HANDLING
+}
+
+enum PolicyStatus {
+  PENDING
+  APPROVED
+}
+
+model StudyPolicyDecision {
+  id           String         @id @default(uuid())
+  experimentId String
+  key          StudyPolicyKey
+  status       PolicyStatus   @default(PENDING)
+  // Key-specific structured value, e.g. { winnerCount: 20 } or retention days.
+  value        Json?
+  note         String?
+  approvalRef  String?
+  decidedById  String?
+  decidedAt    DateTime?
+  updatedAt    DateTime       @updatedAt
+
+  experiment Experiment @relation(fields: [experimentId], references: [id], onDelete: Restrict)
+  decidedBy  User?      @relation(fields: [decidedById], references: [id])
+
+  @@unique([experimentId, key])
+  @@map("study_policy_decisions")
+}
+
+// ---------------------------------------------------------------------------
+// Session configuration snapshots — immutable; an edit creates a new version
+// and the session's currentConfigId moves. Visits and submissions keep the id
+// of the version they were shown.
+// ---------------------------------------------------------------------------
+
+model SessionConfig {
+  id                  String   @id @default(uuid())
+  streamSessionId     String
+  version             Int
+  streamerDisplayName String
+  streamerImageUrl    String?
+  welcomeText         String
+  channelUrl          String?
+  platform            String?
+  // { heroHeadline, heroSubtext, howItWorks: string[], faqItems: {q,a}[] }
+  homepageContent     Json
+  // { mechanism: "FIXED" | "WEIGHTED_RANDOM", displayItems: {key,label,sub,tier,weight?}[],
+  //   fixedResultKey?, resultHeadline, resultExplanation }
+  rewardConfig        Json
+  createdById         String?
+  createdAt           DateTime @default(now())
+
+  streamSession StreamSession  @relation("SessionConfigs", fields: [streamSessionId], references: [id], onDelete: Restrict)
+  currentFor    StreamSession? @relation("CurrentSessionConfig")
+  createdBy     User?          @relation(fields: [createdById], references: [id])
+  visits        Visit[]
+  submissions   Submission[]
+  spins         SpinOutcome[]
+
+  @@unique([streamSessionId, version])
+  @@map("session_configs")
+}
+
+// Log of actual start/end corrections (and entry-close actions).
+model SessionTimingChange {
+  id              String    @id @default(uuid())
+  streamSessionId String
+  field           String
+  previousValue   DateTime?
+  newValue        DateTime?
+  reason          String?
+  changedById     String?
+  changedAt       DateTime  @default(now())
+
+  streamSession StreamSession @relation(fields: [streamSessionId], references: [id], onDelete: Restrict)
+
+  @@index([streamSessionId])
+  @@map("session_timing_changes")
+}
+
+// ---------------------------------------------------------------------------
+// Visitors, visits and engagement
+// ---------------------------------------------------------------------------
+
+// A first-party browser identifier — NOT a person. The cookie holds a random
+// opaque token; only its SHA-256 is stored, so the table can't be used to
+// impersonate a browser.
+model BrowserVisitor {
+  id         String   @id @default(uuid())
+  tokenHash  String   @unique
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  visits      Visit[]
+  submissions Submission[]
+
+  @@map("browser_visitors")
+}
+
+enum AttributionSource {
+  // ?ref= code of a tracking link belonging to the active session.
+  TRACKING_LINK
+  // No ref: attributed to whichever session was active.
+  ACTIVE_SESSION
+  // ?ref= code of a link for a different/older session — shown the active
+  // session, but kept distinguishable instead of credited to the old link.
+  STALE_TRACKING_LINK
+  // ?ref= code that matches no tracking link.
+  UNKNOWN_TRACKING_CODE
+}
+
+// A visit = consecutive activity by one browser on one session, ending after
+// VISIT_INACTIVITY_TIMEOUT_MS (30 min, src/lib/study/constants.ts) without any
+// event/heartbeat. Created only by client-side JS (startVisit), so server
+// renders and link-preview bots do not create visits.
+model Visit {
+  id                String            @id @default(uuid())
+  visitorId         String
+  experimentId      String
+  streamSessionId   String
+  configId          String
+  attributionSource AttributionSource
+  trackingLinkId    String?
+  // For STALE_TRACKING_LINK / UNKNOWN_TRACKING_CODE: the code as received (max 64 chars).
+  receivedRefCode   String?
+  referrerHost      String?
+  startedAt         DateTime          @default(now())
+  lastSeenAt        DateTime          @default(now())
+  // Estimated visible time: heartbeat-credited, capped per interval, merged
+  // across tabs (never summed per tab). See src/lib/study/activity.ts.
+  activeMs          Int               @default(0)
+  activeCreditAt    DateTime?
+
+  visitor       BrowserVisitor @relation(fields: [visitorId], references: [id], onDelete: Restrict)
+  experiment    Experiment     @relation(fields: [experimentId], references: [id], onDelete: Restrict)
+  streamSession StreamSession  @relation(fields: [streamSessionId], references: [id], onDelete: Restrict)
+  config        SessionConfig  @relation(fields: [configId], references: [id], onDelete: Restrict)
+  trackingLink  TrackingLink?  @relation(fields: [trackingLinkId], references: [id], onDelete: SetNull)
+
+  events      StudyEvent[]
+  spin        SpinOutcome?
+  submissions Submission[]
+
+  @@index([visitorId, streamSessionId, lastSeenAt])
+  @@index([streamSessionId, startedAt])
+  @@index([experimentId])
+  @@map("visits")
+}
+
+enum StudyEventType {
+  LANDING_VIEWED
+  REWARD_SECTION_VIEWED
+  SPIN_CLICKED
+  SPIN_COMPLETED
+  FORM_OPENED
+  FIELD_INTERACTED
+  FORM_CLOSED
+  SUBMISSION_ATTEMPTED
+  SUBMISSION_REJECTED
+  SUBMISSION_SAVED
+  DUPLICATE_CLASSIFIED
+  CONFIRMATION_VIEWED
+  PAGE_HIDDEN
+  PAGE_VISIBLE
+}
+
+// Bounded, server-validated events. `element` is restricted to a whitelist
+// (field names / section ids) and `detail` is built server-side only — never
+// field values, keystrokes, or contact details.
+model StudyEvent {
+  id              String         @id @default(uuid())
+  visitId         String
+  experimentId    String
+  streamSessionId String
+  submissionId    String?
+  type            StudyEventType
+  element         String?
+  detail          Json?
+  occurredAt      DateTime       @default(now())
+
+  visit         Visit         @relation(fields: [visitId], references: [id], onDelete: Restrict)
+  experiment    Experiment    @relation(fields: [experimentId], references: [id], onDelete: Restrict)
+  streamSession StreamSession @relation(fields: [streamSessionId], references: [id], onDelete: Restrict)
+  submission    Submission?   @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+
+  @@index([streamSessionId, occurredAt])
+  @@index([visitId])
+  @@index([type])
+  @@map("study_events")
+}
+
+// Server-authoritative spin result, persisted when the spin happens. One per
+// visit: repeated clicks return the same stored outcome.
+model SpinOutcome {
+  id              String   @id @default(uuid())
+  visitId         String   @unique
+  streamSessionId String
+  configId        String
+  // Recorded honestly: FIXED when the configured result is predetermined.
+  mechanism       String
+  resultKey       String
+  resultLabel     String
+  createdAt       DateTime @default(now())
+
+  visit         Visit         @relation(fields: [visitId], references: [id], onDelete: Restrict)
+  streamSession StreamSession @relation(fields: [streamSessionId], references: [id], onDelete: Restrict)
+  config        SessionConfig @relation(fields: [configId], references: [id], onDelete: Restrict)
+  submissions   Submission[]
+
+  @@map("spin_outcomes")
+}
+
+// ---------------------------------------------------------------------------
+// Submissions and duplicates
+// ---------------------------------------------------------------------------
+
+enum AgeGroup {
+  BELOW_18
+  AGE_18_30
+  AGE_31_PLUS
+}
+
+enum SocialContactType {
+  DISCORD
+  FACEBOOK
+}
+
+enum SubmissionStatus {
+  CANONICAL
+  DUPLICATE
+}
+
+enum ExclusionCategory {
+  INCOMPLETE
+  TECHNICAL_ERROR
+  TEST_ENTRY
+  INVALID_SUBMISSION
+  PARTICIPANT_WITHDREW
+  OTHER
+}
+
+// Every genuine submission is its own row — repeats are never overwritten.
+model Submission {
+  id                String             @id @default(uuid())
+  responseCode      String             @unique
+  // Per-browser idempotency key from the form: a network retry or double
+  // click with the same key returns the original row instead of a new one.
+  idempotencyKey    String
+  experimentId      String
+  streamSessionId   String
+  configId          String
+  visitId           String
+  visitorId         String
+  spinOutcomeId     String?
+  attributionSource AttributionSource
+  trackingLinkId    String?
+  isTest            Boolean
+  // HMAC of the canonical +E.164 phone (src/lib/study/phone.ts). Not unique:
+  // duplicates must be storable.
+  phoneHash         String
+  ageGroup          AgeGroup
+  emailProvided     Boolean            @default(false)
+  ignProvided       Boolean            @default(false)
+  socialType        SocialContactType?
+  socialProvided    Boolean            @default(false)
+  status            SubmissionStatus
+  canonicalId       String?
+  submittedAt       DateTime           @default(now())
+
+  // Research-analysis exclusion (separate from reward eligibility).
+  researchExcluded        Boolean            @default(false)
+  researchExclusionReason ExclusionCategory?
+  researchExclusionNote   String?
+  // Reward-draw exclusion (separate from research eligibility).
+  drawExcluded            Boolean            @default(false)
+  drawExclusionNote       String?
+  // Research data removed after a decline/withdrawal (events, optional fields).
+  researchDataPurgedAt    DateTime?
+
+  experiment    Experiment     @relation(fields: [experimentId], references: [id], onDelete: Restrict)
+  streamSession StreamSession  @relation(fields: [streamSessionId], references: [id], onDelete: Restrict)
+  config        SessionConfig  @relation(fields: [configId], references: [id], onDelete: Restrict)
+  visit         Visit          @relation(fields: [visitId], references: [id], onDelete: Restrict)
+  visitor       BrowserVisitor @relation(fields: [visitorId], references: [id], onDelete: Restrict)
+  spinOutcome   SpinOutcome?   @relation(fields: [spinOutcomeId], references: [id], onDelete: SetNull)
+  trackingLink  TrackingLink?  @relation(fields: [trackingLinkId], references: [id], onDelete: SetNull)
+  canonical     Submission?    @relation("DuplicateOf", fields: [canonicalId], references: [id], onDelete: Restrict)
+  duplicates    Submission[]   @relation("DuplicateOf")
+
+  contact     SubmissionContact?
+  phoneEntry  CampaignPhoneEntry?
+  events      StudyEvent[]
+  permissions DataUsePermission[]
+  followUp    SubmissionFollowUp?
+  attempts    SubmissionContactAttempt[]
+  interviews  SubmissionInterview[]
+  drawWins    DrawWinner[]
+
+  @@unique([visitorId, idempotencyKey])
+  @@index([experimentId, phoneHash])
+  @@index([streamSessionId, submittedAt])
+  @@index([canonicalId])
+  @@map("submissions")
+}
+
+// One row per (campaign, phone hash): the race-safe canonical claim. The
+// primary key makes concurrent first submissions serialize; the loser is
+// classified as a duplicate of the winner.
+model CampaignPhoneEntry {
+  experimentId          String
+  phoneHash             String
+  scope                 DuplicateScope @default(CAMPAIGN)
+  canonicalSubmissionId String         @unique
+  createdAt             DateTime       @default(now())
+
+  experiment Experiment @relation(fields: [experimentId], references: [id], onDelete: Restrict)
+  canonical  Submission @relation(fields: [canonicalSubmissionId], references: [id], onDelete: Restrict)
+
+  @@id([experimentId, phoneHash])
+  @@map("campaign_phone_entries")
+}
+
+// Encrypted contact values for one submission, separable so it can be purged
+// independently. phoneTail (last 2 digits) supports a masked display only.
+model SubmissionContact {
+  id               String    @id @default(uuid())
+  submissionId     String    @unique
+  encryptedPhone   String?
+  phoneTail        String?
+  encryptedEmail   String?
+  encryptedIgn     String?
+  encryptedSocial  String?
+  phonePurgedAt    DateTime?
+  optionalPurgedAt DateTime?
+  createdAt        DateTime  @default(now())
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+
+  @@map("submission_contacts")
+}
+
+// ---------------------------------------------------------------------------
+// Permissions (append-only history; current state = latest row per type)
+// ---------------------------------------------------------------------------
+
+enum PermissionType {
+  INTERVIEW_PROCEED
+  WEBSITE_DATA_USE
+  INTERVIEW_ANSWERS_USE
+}
+
+enum PermissionStatus {
+  PENDING
+  GRANTED
+  DECLINED
+  WITHDRAWN
+}
+
+enum RecordMethod {
+  PHONE_CALL
+  WHATSAPP
+  SMS
+  IN_PERSON
+  OTHER
+}
+
+model DataUsePermission {
+  id            String           @id @default(uuid())
+  submissionId  String
+  type          PermissionType
+  status        PermissionStatus
+  noticeVersion String
+  method        RecordMethod
+  note          String?
+  recordedById  String
+  recordedAt    DateTime         @default(now())
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+  recordedBy User       @relation(fields: [recordedById], references: [id])
+
+  @@index([submissionId, type, recordedAt])
+  @@map("data_use_permissions")
+}
+
+// ---------------------------------------------------------------------------
+// Follow-up (phone interview) for submissions
+// ---------------------------------------------------------------------------
+
+enum FollowUpStatus {
+  NOT_CONTACTED
+  ATTEMPTING
+  REACHED
+  INTERVIEW_COMPLETED
+  DECLINED_INTERVIEW
+  UNREACHABLE
+}
+
+model SubmissionFollowUp {
+  id             String         @id @default(uuid())
+  submissionId   String         @unique
+  status         FollowUpStatus @default(NOT_CONTACTED)
+  assignedToId   String?
+  nextFollowupAt DateTime?
+  notes          String?
+  updatedAt      DateTime       @updatedAt
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+  assignedTo User?      @relation(fields: [assignedToId], references: [id])
+
+  @@map("submission_follow_ups")
+}
+
+model SubmissionContactAttempt {
+  id           String         @id @default(uuid())
+  submissionId String
+  attemptedAt  DateTime       @default(now())
+  outcome      ContactOutcome
+  method       RecordMethod   @default(PHONE_CALL)
+  note         String?
+  researcherId String
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+  researcher User       @relation(fields: [researcherId], references: [id])
+
+  @@index([submissionId])
+  @@map("submission_contact_attempts")
+}
+
+model SubmissionInterview {
+  id              String                @id @default(uuid())
+  submissionId    String
+  interviewerId   String
+  mode            InterviewMode         @default(PHONE_CALL)
+  status          InterviewRecordStatus @default(SCHEDULED)
+  scriptVersion   String?
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  endedAt         DateTime?
+  durationMinutes Int?
+  summary         String?
+  themes          String[]
+  notes           String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  submission  Submission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+  interviewer User       @relation(fields: [interviewerId], references: [id])
+
+  @@index([submissionId])
+  @@map("submission_interviews")
+}
+
+// ---------------------------------------------------------------------------
+// Reward draw (BDT 100 bKash per winner) — separate from the wheel display
+// ---------------------------------------------------------------------------
+
+enum DrawStatus {
+  FINALIZED
+  VOIDED
+}
+
+model RewardDraw {
+  id                   String     @id @default(uuid())
+  experimentId         String
+  isTest               Boolean
+  status               DrawStatus @default(FINALIZED)
+  // "<experimentId>:<test|live>" while FINALIZED, null once voided — the
+  // unique constraint prevents a second finalized draw (accidental rerun).
+  finalizedKey         String?    @unique
+  requestedWinnerCount Int
+  eligibleCount        Int
+  // [{ submissionId, responseCode }] in the order considered.
+  eligibleSnapshot     Json
+  method               String
+  executedById         String
+  executedAt           DateTime   @default(now())
+  voidedAt             DateTime?
+  voidReason           String?
+
+  experiment Experiment   @relation(fields: [experimentId], references: [id], onDelete: Restrict)
+  executedBy User         @relation(fields: [executedById], references: [id])
+  winners    DrawWinner[]
+
+  @@index([experimentId])
+  @@map("reward_draws")
+}
+
+enum PayoutStatus {
+  PENDING
+  PAID
+  FAILED
+  UNREACHABLE
+}
+
+model DrawWinner {
+  id           String       @id @default(uuid())
+  drawId       String
+  submissionId String
+  rank         Int
+  payoutStatus PayoutStatus @default(PENDING)
+  amountBdt    Int          @default(100)
+  // bKash transaction id or similar reference — never a PIN or OTP.
+  paymentRef   String?
+  paidAt       DateTime?
+  updatedById  String?
+  updatedAt    DateTime     @updatedAt
+
+  draw       RewardDraw @relation(fields: [drawId], references: [id], onDelete: Restrict)
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+  updatedBy  User?      @relation(fields: [updatedById], references: [id])
+
+  @@unique([drawId, submissionId])
+  @@unique([drawId, rank])
+  @@map("draw_winners")
+}
+
+// ---------------------------------------------------------------------------
+// Platform metrics (entered/imported; not measured by this website)
+// ---------------------------------------------------------------------------
+
+model PlatformMetric {
+  id                     String    @id @default(uuid())
+  streamSessionId        String
+  platform               String
+  platformStreamId       String?
+  durationMinutes        Int?
+  views                  Int?
+  avgConcurrentViewers   Int?
+  peakConcurrentViewers  Int?
+  watchTimeMinutes       Int?
+  avgViewDurationSeconds Int?
+  likes                  Int?
+  comments               Int?
+  shares                 Int?
+  newFollowers           Int?
+  // e.g. "YouTube Studio export", "Facebook Insights", "manual observation".
+  source                 String
+  measuredAt             DateTime
+  windowStart            DateTime?
+  windowEnd              DateTime?
+  notes                  String?
+  recordedById           String?
+  createdAt              DateTime  @default(now())
+
+  streamSession StreamSession @relation(fields: [streamSessionId], references: [id], onDelete: Restrict)
+  recordedBy    User?         @relation(fields: [recordedById], references: [id])
+
+  @@index([streamSessionId])
+  @@map("platform_metrics")
+}
+
+enum AnnotationType {
+  STREAM_START
+  STREAM_END
+  CHAT_QUESTION
+  CHAT_ANSWER
+  LINK_SHARED
+  OTHER
+}
+
+model SessionAnnotation {
+  id              String         @id @default(uuid())
+  streamSessionId String
+  type            AnnotationType
+  occurredAt      DateTime
+  note            String
+  createdById     String?
+  createdAt       DateTime       @default(now())
+
+  streamSession StreamSession @relation(fields: [streamSessionId], references: [id], onDelete: Restrict)
+  createdBy     User?         @relation(fields: [createdById], references: [id])
+
+  @@index([streamSessionId, occurredAt])
+  @@map("session_annotations")
+}
+
+// ---------------------------------------------------------------------------
+// Audit log and rate limiting
+// ---------------------------------------------------------------------------
+
+// Who did what to which record. `detail` must never contain contact values.
+model AuditLog {
+  id           String   @id @default(uuid())
+  actorId      String?
+  action       String
+  entityType   String
+  entityId     String?
+  experimentId String?
+  detail       Json?
+  createdAt    DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([experimentId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+// Fixed-window counters keyed by an HMAC of (scope, visitor or IP) — the raw
+// IP is never stored.
+model RateLimitBucket {
+  key         String   @id
+  windowStart DateTime
+  count       Int
+
+  @@map("rate_limit_buckets")
 }

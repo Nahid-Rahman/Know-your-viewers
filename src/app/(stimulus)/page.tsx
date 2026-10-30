@@ -1,65 +1,42 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
-import { PARTICIPANT_COOKIE, toRuntimeConfig } from "@/lib/participant";
-import { getSiteContent, getExperimentStreamerOptions } from "@/lib/queries/research";
-import type { Rarity } from "@/components/common/rarity-badge";
-import { HeroSection } from "@/features/stimulus/sections/hero-section";
-import { TrustBadgesSection } from "@/features/stimulus/sections/trust-badges-section";
-import { CategoriesSection } from "@/features/stimulus/sections/categories-section";
-import { RewardRouletteSection } from "@/features/stimulus/sections/reward-roulette-section";
-import { HowItWorksSection } from "@/features/stimulus/sections/how-it-works-section";
-import { FaqSection } from "@/features/stimulus/sections/faq-section";
+import { loadPublicPage } from "@/lib/study/public-page";
+import { StudyHome } from "@/features/study/study-home";
 
-const FALLBACK_CONTENT = {
-  heroHeadline: "UNLOCK\nYOUR\n**VIEWER DROP**\nTODAY!",
-  heroSubtext:
-    "Spin the reward roll for a chance to unlock exclusive viewer bonuses before the event closes. Verified event access. No password required.",
-  claimedCount: "247,000+",
-  countdownSeconds: 23 * 3600 + 48 * 60 + 21,
-  trustBadges: [] as { icon: string; title: string; description: string }[],
-  gameCategories: [] as { icon: string; image: string; tag: string; title: string; description: string }[],
-  rewardPool: [] as { label: string; sub: string; rarity: Rarity }[],
-  gameTypeOptions: [] as string[],
-  watchFrequencyOptions: [] as string[],
-  faqItems: [] as { q: string; a: string }[],
-};
+// Always rendered per request: which session is active, and whether its
+// entry window is still open, is decided with server time.
+export const dynamic = "force-dynamic";
 
 export default async function LandingPage({ searchParams }: PageProps<"/">) {
   const params = await searchParams;
-  const ref = typeof params.ref === "string" ? params.ref : undefined;
-  const bootstrapUrl = `/api/bootstrap${ref ? `?ref=${encodeURIComponent(ref)}` : ""}`;
+  const ref = typeof params.ref === "string" ? params.ref.slice(0, 64) : null;
+  const page = await loadPublicPage();
 
-  const cookieStore = await cookies();
-  const participantId = cookieStore.get(PARTICIPANT_COOKIE)?.value;
-  if (!participantId) redirect(bootstrapUrl);
-
-  const participant = await prisma.participant.findUnique({
-    where: { id: participantId },
-    include: { condition: true, trackingLink: true },
-  });
-  if (!participant) redirect(bootstrapUrl);
-
-  await prisma.engagementEvent.create({ data: { participantId: participant.id, type: "PAGE_VIEW" } });
-  const config = toRuntimeConfig(participant.condition);
-  const content = (await getSiteContent()) ?? FALLBACK_CONTENT;
-  const streamerOptions = await getExperimentStreamerOptions(participant.experimentId);
-
-  return (
-    <>
-      <HeroSection config={config} content={content} />
-      <TrustBadgesSection badges={content.trustBadges} />
-      <CategoriesSection gameCategories={content.gameCategories} />
-      <RewardRouletteSection
-        config={config}
-        rewardPool={content.rewardPool as { label: string; sub: string; rarity: Rarity }[]}
-        gameTypeOptions={content.gameTypeOptions}
-        watchFrequencyOptions={content.watchFrequencyOptions}
-        streamerOptions={streamerOptions}
-        defaultStreamerId={participant.trackingLink?.streamerId ?? null}
+  if (page.kind === "none") {
+    return (
+      <StatusPanel
+        title="No stream is running right now"
+        body="This page is only open during a collaborating streamer's session and for two hours after it ends. Please check back during the next stream."
       />
-      <HowItWorksSection />
-      <FaqSection faqItems={content.faqItems} />
-    </>
+    );
+  }
+  if (page.kind === "closed") {
+    return (
+      <StatusPanel
+        title={`Entries for ${page.streamerName}'s session are closed`}
+        body={`${page.deadlineText ? `${page.deadlineText}. ` : ""}Thanks for watching — winners of the prize draw will be contacted by phone after the draw.`}
+      />
+    );
+  }
+  return <StudyHome {...page.props} refCode={ref} />;
+}
+
+function StatusPanel({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="mx-auto flex w-full max-w-xl flex-col items-center px-4 py-24 text-center">
+      <div className="mb-5 flex size-14 items-center justify-center rounded-full border border-border bg-card text-2xl" aria-hidden>
+        ⏸
+      </div>
+      <h1 className="font-display text-3xl font-bold">{title}</h1>
+      <p className="mt-3 text-sm text-muted-foreground">{body}</p>
+    </div>
   );
 }

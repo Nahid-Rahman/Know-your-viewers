@@ -1,3 +1,4 @@
+import { researcherScope } from "@/lib/study/researcher";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -8,7 +9,6 @@ import { EmptyState } from "@/components/common/empty-state";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { requireRoleOrRedirect } from "@/lib/auth";
 import { getParticipantDetail, RECRUITMENT_SOURCE_LABELS } from "@/lib/queries/research";
 import { EligibilityForm } from "@/features/outreach/eligibility-form";
 
@@ -30,9 +30,9 @@ function fmtDuration(seconds: number | null) {
 export default async function ParticipantDetailPage({
   params,
 }: PageProps<"/researcher/participants/[id]">) {
-  await requireRoleOrRedirect("RESEARCHER");
+  const { scope } = await researcherScope();
   const { id } = await params;
-  const p = await getParticipantDetail(id);
+  const p = await getParticipantDetail(id, scope);
   if (!p) notFound();
 
   return (

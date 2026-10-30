@@ -1,3 +1,4 @@
+import { requireExperimentPage } from "@/lib/study/researcher";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StatusBadge } from "@/components/common/status-badge";
@@ -9,6 +10,7 @@ export default async function ExperimentDetailLayout({
   params,
 }: LayoutProps<"/researcher/experiments/[id]">) {
   const { id } = await params;
+  await requireExperimentPage(id);
   const experiment = await getExperimentById(id);
   if (!experiment) notFound();
 

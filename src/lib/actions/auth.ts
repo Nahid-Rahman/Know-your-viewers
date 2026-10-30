@@ -10,13 +10,6 @@ const loginSchema = z.object({
   password: z.string().min(6),
 });
 
-const registerSchema = z.object({
-  name: z.string().min(2),
-  email: z.string().email(),
-  password: z.string().min(6),
-  role: z.enum(["RESEARCHER", "STREAMER"]),
-});
-
 const SUPABASE_NOT_CONFIGURED =
   "Supabase isn't connected yet — add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.";
 
@@ -42,40 +35,12 @@ export async function login(
   return { role: user.role };
 }
 
-export async function register(
-  values: z.infer<typeof registerSchema>,
-): Promise<{ error: string } | { needsEmailConfirmation: true } | { role: Role }> {
-  if (!supabaseConfigured()) return { error: SUPABASE_NOT_CONFIGURED };
-
-  const parsed = registerSchema.safeParse(values);
-  if (!parsed.success) return { error: "Please check the form for errors." };
-  const { name, email, password, role } = parsed.data;
-
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error || !data.user) return { error: error?.message ?? "Registration failed." };
-
-  const user = await prisma.user.create({
-    data: { supabaseId: data.user.id, name, email, role },
-  });
-
-  // The register form doesn't collect streamer-specific details — create a
-  // placeholder profile the streamer fills in from /streamer/profile.
-  if (role === "STREAMER") {
-    await prisma.streamer.create({
-      data: {
-        userId: user.id,
-        displayName: name,
-        platform: "Twitch",
-        channelUrl: "",
-        category: "Unspecified",
-        status: "PENDING",
-      },
-    });
-  }
-
-  // Supabase projects with email confirmation on won't return a session yet.
-  if (!data.session) return { needsEmailConfirmation: true };
-
-  return { role: user.role };
+/**
+ * Public self-registration is disabled: it accepted a client-chosen role
+ * (including RESEARCHER). Privileged accounts are created only through a
+ * trusted process — scripts/create-account.mts, or a researcher creating a
+ * streamer login from the Streamers screen.
+ */
+export async function register(): Promise<{ error: string }> {
+  return { error: "Public registration is closed. Ask the research team for an account." };
 }

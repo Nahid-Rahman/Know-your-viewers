@@ -3,7 +3,6 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getSiteContent } from "@/lib/queries/research";
 import { DEFAULT_SITE_CONTENT } from "@/lib/site-content-defaults";
-import { CtaLink } from "@/features/stimulus/components/cta-link";
 
 export async function SiteNavbar() {
   const content = (await getSiteContent()) ?? DEFAULT_SITE_CONTENT;
@@ -32,14 +31,13 @@ export async function SiteNavbar() {
           ))}
         </nav>
 
-        <CtaLink
+        <Link
           href="/#spin"
-          element="navbar-cta"
           prefetch={false}
           className={cn(buttonVariants(), "bg-gradient-primary text-white hover:opacity-90")}
         >
           {ctaLabel}
-        </CtaLink>
+        </Link>
       </div>
     </header>
   );

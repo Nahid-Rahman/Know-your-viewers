@@ -1,3 +1,4 @@
+import { researcherScope } from "@/lib/study/researcher";
 import Link from "next/link";
 import { EmptyState } from "@/components/common/empty-state";
 import {
@@ -30,7 +31,7 @@ export default async function DataTablesPage({
     : "participants") as DataTableKey;
   const page = typeof sp.page === "string" ? Math.max(Number(sp.page) || 1, 1) : 1;
 
-  const { columns, rows, total } = await getDataTable(tableKey, page);
+  const { columns, rows, total } = await getDataTable(tableKey, page, (await researcherScope()).scope);
   const totalPages = Math.max(Math.ceil(total / DATA_TABLE_PAGE_SIZE), 1);
   const activeOption = DATA_TABLE_OPTIONS.find((o) => o.key === tableKey);
 

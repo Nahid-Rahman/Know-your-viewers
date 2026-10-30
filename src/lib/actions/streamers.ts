@@ -120,6 +120,15 @@ export async function deleteStreamer(streamerId: string): Promise<{ error: strin
   const streamer = await prisma.streamer.findUnique({ where: { id: streamerId }, include: { user: true } });
   if (!streamer) return { error: "Streamer not found." };
 
+  // Streamers with sessions or attributed records are kept for history.
+  const [sessions, viewers] = await Promise.all([
+    prisma.streamSession.count({ where: { streamerId } }),
+    prisma.participant.count({ where: { streamerId } }),
+  ]);
+  if (sessions || viewers) {
+    return { error: "This streamer has stream sessions or study records and can't be deleted. Set their status to Inactive instead." };
+  }
+
   // TrackingLink.streamerId and Participant.streamerId have no cascade rule
   // — unassign both first so the cascade from deleting the User (below)
   // doesn't hit a FK violation.

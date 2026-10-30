@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireRole, AuthError } from "@/lib/auth";
+import { AuthError } from "@/lib/auth";
+import { requireLegacyParticipantAccess } from "@/lib/study/legacy-access";
 import type { DebriefStatus, DebriefMethod } from "@/generated/prisma/enums";
 
 function revalidateDebrief() {
@@ -21,7 +22,7 @@ export async function updateDebriefWorkflow(
   input: { debriefStatus?: DebriefStatus; debriefMethod?: DebriefMethod | null; debriefNotes?: string; markSent?: boolean },
 ): Promise<{ error: string } | { ok: true }> {
   try {
-    await requireRole("RESEARCHER");
+    await requireLegacyParticipantAccess(participantId);
   } catch (err) {
     if (err instanceof AuthError) return { error: err.message };
     throw err;

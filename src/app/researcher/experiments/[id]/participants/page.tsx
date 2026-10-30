@@ -1,3 +1,4 @@
+import { requireExperimentPage } from "@/lib/study/researcher";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Users, ArrowRight } from "lucide-react";
@@ -14,6 +15,7 @@ export default async function ExperimentParticipantsPage({
   params,
 }: PageProps<"/researcher/experiments/[id]/participants">) {
   const { id } = await params;
+  await requireExperimentPage(id);
   const experiment = await getExperimentById(id);
   if (!experiment) notFound();
 

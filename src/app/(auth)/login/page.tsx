@@ -104,7 +104,7 @@ export default function LoginPage() {
       <p className="mt-5 text-center text-sm text-muted-foreground">
         No account?{" "}
         <Link href="/register" className="font-medium text-primary hover:underline">
-          Register
+          How accounts are created
         </Link>
       </p>
     </div>

@@ -127,7 +127,7 @@ export const DEFAULT_SITE_CONTENT: SiteContentValues = {
     "Academic research prototype studying livestream gaming recruitment and disclosure behaviour.",
   heroHeadline: "UNLOCK\nYOUR\n**VIEWER DROP**\nTODAY!",
   heroSubtext:
-    "Spin the reward roll for a chance to unlock exclusive viewer bonuses before the event closes. Verified event access. No password required.",
+    "Spin the reward roll for a chance to unlock exclusive viewer bonuses before the event closes. No password required.",
   claimedCount: "247,000+",
   countdownSeconds: 23 * 3600 + 48 * 60 + 21,
   trustBadges: [],

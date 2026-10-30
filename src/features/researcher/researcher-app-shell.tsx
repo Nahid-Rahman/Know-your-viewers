@@ -1,16 +1,18 @@
 "use client";
 
-import { LayoutDashboard, FlaskConical, Users, UserSearch, PhoneCall, DatabaseZap, Settings } from "lucide-react";
+import { LayoutDashboard, FlaskConical, Users, UserSearch, PhoneCall, DatabaseZap, Settings, ClipboardList, ScrollText } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import type { NavItem } from "@/components/layout/sidebar-nav";
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/researcher/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/researcher/experiments", label: "Experiments", icon: FlaskConical },
-  { href: "/researcher/participants", label: "Participants", icon: UserSearch },
+  { href: "/researcher/experiments", label: "Campaigns", icon: FlaskConical },
+  { href: "/researcher/submissions", label: "Submissions", icon: ClipboardList },
   { href: "/researcher/streamers", label: "Streamers", icon: Users },
-  { href: "/researcher/outreach", label: "Outreach", icon: PhoneCall },
   { href: "/researcher/research-dataset", label: "Research Dataset", icon: DatabaseZap },
+  { href: "/researcher/participants", label: "Legacy Participants", icon: UserSearch },
+  { href: "/researcher/outreach", label: "Legacy Outreach", icon: PhoneCall },
+  { href: "/researcher/audit", label: "Audit Log", icon: ScrollText },
   { href: "/researcher/settings", label: "Settings", icon: Settings },
 ];
 

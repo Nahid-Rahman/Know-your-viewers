@@ -1,3 +1,4 @@
+import { requireExperimentPage } from "@/lib/study/researcher";
 import { notFound } from "next/navigation";
 import { SurveyManager } from "@/features/survey/survey-manager";
 import { getExperimentById, getSurveysForExperiment } from "@/lib/queries/research";
@@ -6,6 +7,7 @@ export default async function SurveysPage({
   params,
 }: PageProps<"/researcher/experiments/[id]/surveys">) {
   const { id } = await params;
+  await requireExperimentPage(id);
   const experiment = await getExperimentById(id);
   if (!experiment) notFound();
 

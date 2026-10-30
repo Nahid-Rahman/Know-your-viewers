@@ -1,3 +1,4 @@
+import { researcherScope } from "@/lib/study/researcher";
 import { EmptyState } from "@/components/common/empty-state";
 import {
   Table,
@@ -24,7 +25,9 @@ export default async function ContactsPage({
   const sp = await searchParams;
   const get = (key: string) => (typeof sp[key] === "string" ? (sp[key] as string) : undefined);
 
+  const { scope } = await researcherScope();
   const filters: ContactQueueFilters = {
+    scope,
     q: get("q"),
     contactStatus: get("contactStatus") as ContactStatus | undefined,
     researcherAssignedId: get("researcherAssignedId"),

@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireRole, AuthError } from "@/lib/auth";
+import { AuthError } from "@/lib/auth";
+import { requireLegacyParticipantAccess, requireLegacyInterviewAccess } from "@/lib/study/legacy-access";
 import type {
   InterviewConsentAnswer,
   InterviewCandidateStatus,
@@ -36,7 +37,7 @@ export async function updateInterviewConsent(
   input: InterviewConsentInput,
 ): Promise<{ error: string } | { ok: true }> {
   try {
-    await requireRole("RESEARCHER");
+    await requireLegacyParticipantAccess(participantId);
   } catch (err) {
     if (err instanceof AuthError) return { error: err.message };
     throw err;
@@ -110,7 +111,7 @@ export async function createInterviewRecord(
 ): Promise<{ error: string } | { ok: true }> {
   let researcher;
   try {
-    researcher = await requireRole("RESEARCHER");
+    researcher = await requireLegacyParticipantAccess(participantId);
   } catch (err) {
     if (err instanceof AuthError) return { error: err.message };
     throw err;
@@ -151,7 +152,7 @@ export async function updateInterviewRecord(
   input: InterviewRecordInput,
 ): Promise<{ error: string } | { ok: true }> {
   try {
-    await requireRole("RESEARCHER");
+    await requireLegacyInterviewAccess(interviewId);
   } catch (err) {
     if (err instanceof AuthError) return { error: err.message };
     throw err;

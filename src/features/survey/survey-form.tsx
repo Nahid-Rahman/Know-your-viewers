@@ -18,7 +18,7 @@ export function SurveyForm({ survey }: { survey: Survey }) {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    void logEngagementEvent("PAGE_VIEW");
+    void logEngagementEvent("survey");
   }, []);
 
   const answeredCount = Object.keys(answers).length;

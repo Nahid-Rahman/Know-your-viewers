@@ -18,10 +18,11 @@ function fmtDate(d: Date | null | undefined): string | null {
   return d ? d.toISOString() : null;
 }
 
-async function participantsTable(page: number): Promise<DataTableResult> {
+async function participantsTable(page: number, scope: string[]): Promise<DataTableResult> {
   const [total, rows] = await Promise.all([
-    prisma.participant.count(),
+    prisma.participant.count({ where: { experimentId: { in: scope } } }),
     prisma.participant.findMany({
+      where: { experimentId: { in: scope } },
       include: {
         experiment: { select: { title: true } },
         condition: { select: { name: true } },
@@ -50,8 +51,8 @@ async function participantsTable(page: number): Promise<DataTableResult> {
   };
 }
 
-async function participantSessionsTable(page: number): Promise<DataTableResult> {
-  const all = await getBehavioralDatasetRows();
+async function participantSessionsTable(page: number, scope: string[]): Promise<DataTableResult> {
+  const all = await getBehavioralDatasetRows(scope);
   const total = all.length;
   const slice = all.slice((page - 1) * PAGE_SIZE, (page - 1) * PAGE_SIZE + PAGE_SIZE);
   return {
@@ -61,10 +62,11 @@ async function participantSessionsTable(page: number): Promise<DataTableResult> 
   };
 }
 
-async function participantEventsTable(page: number): Promise<DataTableResult> {
+async function participantEventsTable(page: number, scope: string[]): Promise<DataTableResult> {
   const [total, rows] = await Promise.all([
-    prisma.engagementEvent.count(),
+    prisma.engagementEvent.count({ where: { participant: { experimentId: { in: scope } } } }),
     prisma.engagementEvent.findMany({
+      where: { participant: { experimentId: { in: scope } } },
       include: { participant: { select: { anonymousCode: true } } },
       orderBy: { timestamp: "desc" },
       skip: (page - 1) * PAGE_SIZE,
@@ -78,10 +80,11 @@ async function participantEventsTable(page: number): Promise<DataTableResult> {
   };
 }
 
-async function participantResponsesTable(page: number): Promise<DataTableResult> {
+async function participantResponsesTable(page: number, scope: string[]): Promise<DataTableResult> {
   const [total, rows] = await Promise.all([
-    prisma.response.count(),
+    prisma.response.count({ where: { participant: { experimentId: { in: scope } } } }),
     prisma.response.findMany({
+      where: { participant: { experimentId: { in: scope } } },
       include: {
         participant: { select: { anonymousCode: true } },
         survey: { select: { title: true, questions: { select: { id: true, order: true, questionText: true } } } },
@@ -107,10 +110,10 @@ async function participantResponsesTable(page: number): Promise<DataTableResult>
   };
 }
 
-async function streamersTable(page: number): Promise<DataTableResult> {
+async function streamersTable(page: number, scope: string[]): Promise<DataTableResult> {
   const [total, rows] = await Promise.all([
-    prisma.streamer.count(),
-    prisma.streamer.findMany({ orderBy: { createdAt: "desc" }, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE }),
+    prisma.streamer.count({ where: { experiments: { some: { experimentId: { in: scope } } } } }),
+    prisma.streamer.findMany({ where: { experiments: { some: { experimentId: { in: scope } } } }, orderBy: { createdAt: "desc" }, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE }),
   ]);
   return {
     columns: ["Streamer", "Platform", "Channel URL", "Category", "Status", "Created At"],
@@ -119,10 +122,11 @@ async function streamersTable(page: number): Promise<DataTableResult> {
   };
 }
 
-async function streamSessionsTable(page: number): Promise<DataTableResult> {
+async function streamSessionsTable(page: number, scope: string[]): Promise<DataTableResult> {
   const [total, rows] = await Promise.all([
-    prisma.streamSession.count(),
+    prisma.streamSession.count({ where: { experimentId: { in: scope } } }),
     prisma.streamSession.findMany({
+      where: { experimentId: { in: scope } },
       include: { streamer: { select: { displayName: true } }, experiment: { select: { title: true } } },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
@@ -158,10 +162,11 @@ async function streamSessionsTable(page: number): Promise<DataTableResult> {
   };
 }
 
-async function recruitmentSourcesTable(page: number): Promise<DataTableResult> {
+async function recruitmentSourcesTable(page: number, scope: string[]): Promise<DataTableResult> {
   const [total, links] = await Promise.all([
-    prisma.trackingLink.count(),
+    prisma.trackingLink.count({ where: { experimentId: { in: scope } } }),
     prisma.trackingLink.findMany({
+      where: { experimentId: { in: scope } },
       include: { streamer: { select: { displayName: true } }, streamSession: { select: { streamTitle: true } } },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
@@ -191,10 +196,11 @@ async function recruitmentSourcesTable(page: number): Promise<DataTableResult> {
   };
 }
 
-async function participantContactsTable(page: number): Promise<DataTableResult> {
+async function participantContactsTable(page: number, scope: string[]): Promise<DataTableResult> {
   const [total, rows] = await Promise.all([
-    prisma.participantContact.count(),
+    prisma.participantContact.count({ where: { participant: { experimentId: { in: scope } } } }),
     prisma.participantContact.findMany({
+      where: { participant: { experimentId: { in: scope } } },
       include: { participant: { select: { anonymousCode: true } } },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
@@ -216,10 +222,11 @@ async function participantContactsTable(page: number): Promise<DataTableResult> 
   };
 }
 
-async function debriefRecordsTable(page: number): Promise<DataTableResult> {
+async function debriefRecordsTable(page: number, scope: string[]): Promise<DataTableResult> {
   const [total, rows] = await Promise.all([
-    prisma.debrief.count(),
+    prisma.debrief.count({ where: { participant: { experimentId: { in: scope } } } }),
     prisma.debrief.findMany({
+      where: { participant: { experimentId: { in: scope } } },
       include: { participant: { select: { anonymousCode: true } } },
       orderBy: { timestamp: "desc" },
       skip: (page - 1) * PAGE_SIZE,
@@ -241,10 +248,11 @@ async function debriefRecordsTable(page: number): Promise<DataTableResult> {
   };
 }
 
-async function dataUsePermissionsTable(page: number): Promise<DataTableResult> {
+async function dataUsePermissionsTable(page: number, scope: string[]): Promise<DataTableResult> {
   const [total, rows] = await Promise.all([
-    prisma.consent.count(),
+    prisma.consent.count({ where: { participant: { experimentId: { in: scope } } } }),
     prisma.consent.findMany({
+      where: { participant: { experimentId: { in: scope } } },
       include: { participant: { select: { anonymousCode: true } } },
       orderBy: { timestamp: "desc" },
       skip: (page - 1) * PAGE_SIZE,
@@ -266,10 +274,11 @@ async function dataUsePermissionsTable(page: number): Promise<DataTableResult> {
   };
 }
 
-async function interviewConsentsTable(page: number): Promise<DataTableResult> {
+async function interviewConsentsTable(page: number, scope: string[]): Promise<DataTableResult> {
   const [total, rows] = await Promise.all([
-    prisma.interviewConsent.count(),
+    prisma.interviewConsent.count({ where: { participant: { experimentId: { in: scope } } } }),
     prisma.interviewConsent.findMany({
+      where: { participant: { experimentId: { in: scope } } },
       include: { participant: { select: { anonymousCode: true } } },
       orderBy: { updatedAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
@@ -291,10 +300,11 @@ async function interviewConsentsTable(page: number): Promise<DataTableResult> {
   };
 }
 
-async function interviewsTable(page: number): Promise<DataTableResult> {
+async function interviewsTable(page: number, scope: string[]): Promise<DataTableResult> {
   const [total, rows] = await Promise.all([
-    prisma.interview.count(),
+    prisma.interview.count({ where: { participant: { experimentId: { in: scope } } } }),
     prisma.interview.findMany({
+      where: { participant: { experimentId: { in: scope } } },
       include: { participant: { select: { anonymousCode: true } }, interviewer: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
@@ -317,10 +327,11 @@ async function interviewsTable(page: number): Promise<DataTableResult> {
   };
 }
 
-async function researchEligibilityTable(page: number): Promise<DataTableResult> {
+async function researchEligibilityTable(page: number, scope: string[]): Promise<DataTableResult> {
   const [total, rows] = await Promise.all([
-    prisma.researchEligibility.count(),
+    prisma.researchEligibility.count({ where: { participant: { experimentId: { in: scope } } } }),
     prisma.researchEligibility.findMany({
+      where: { participant: { experimentId: { in: scope } } },
       include: { participant: { select: { anonymousCode: true } }, excludedByUser: { select: { name: true } } },
       orderBy: { updatedAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
@@ -341,7 +352,7 @@ async function researchEligibilityTable(page: number): Promise<DataTableResult> 
   };
 }
 
-const TABLE_LOADERS: Record<DataTableKey, (page: number) => Promise<DataTableResult>> = {
+const TABLE_LOADERS: Record<DataTableKey, (page: number, scope: string[]) => Promise<DataTableResult>> = {
   participants: participantsTable,
   participant_sessions: participantSessionsTable,
   participant_events: participantEventsTable,
@@ -357,8 +368,8 @@ const TABLE_LOADERS: Record<DataTableKey, (page: number) => Promise<DataTableRes
   research_eligibility: researchEligibilityTable,
 };
 
-export async function getDataTable(key: DataTableKey, page: number): Promise<DataTableResult> {
-  return TABLE_LOADERS[key](Math.max(page, 1));
+export async function getDataTable(key: DataTableKey, page: number, scope: string[]): Promise<DataTableResult> {
+  return TABLE_LOADERS[key](Math.max(page, 1), scope);
 }
 
 export { PAGE_SIZE as DATA_TABLE_PAGE_SIZE };

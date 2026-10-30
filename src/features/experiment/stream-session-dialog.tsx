@@ -21,13 +21,11 @@ import {
   type StreamSessionInput,
 } from "@/lib/actions/stream-sessions";
 import type { StreamSessionRow } from "@/lib/queries/research";
+import { toStudyLocalInput } from "@/lib/study/time";
 
-/** `2026-09-06T16:09` (datetime-local's own format) has no timezone — treated as local time both ways. */
+/** datetime-local values are Asia/Dhaka wall-clock time (see src/lib/study/time.ts), never the browser's or server's zone. */
 function toLocalInputValue(iso: string | null) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return toStudyLocalInput(iso);
 }
 
 export function StreamSessionDialog({
@@ -60,6 +58,7 @@ export function StreamSessionDialog({
     qrDisplayed: session?.qrDisplayed ?? false,
     chatLinkPosted: session?.chatLinkPosted ?? false,
     notes: session?.notes ?? "",
+    sessionType: "STUDY",
   });
 
   function set<K extends keyof StreamSessionInput>(key: K, value: StreamSessionInput[K]) {
@@ -106,6 +105,22 @@ export function StreamSessionDialog({
             <DialogTitle>{session ? "Edit stream session" : "New stream session"}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
+            {!session && (
+              <div className="sm:col-span-2">
+                <Label className="mb-1.5">Session type</Label>
+                <Select value={form.sessionType ?? "STUDY"} onValueChange={(v) => set("sessionType", (v as StreamSessionInput["sessionType"]) ?? "STUDY")}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue>
+                      {(value: string) => (value === "NORMAL_BASELINE" ? "A — Normal livestream (baseline, no website)" : "B — Study livestream (website link)")}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="STUDY">B — Study livestream (website link)</SelectItem>
+                    <SelectItem value="NORMAL_BASELINE">A — Normal livestream (baseline, no website)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="sm:col-span-2">
               <Label className="mb-1.5">Streamer</Label>
               <Select value={form.streamerId} onValueChange={(v) => set("streamerId", v ?? "")}>
@@ -148,7 +163,7 @@ export function StreamSessionDialog({
               />
             </div>
             <div>
-              <Label className="mb-1.5">Stream start</Label>
+              <Label className="mb-1.5">Planned stream start (Dhaka)</Label>
               <Input
                 type="datetime-local"
                 value={form.streamStartTime ?? ""}
@@ -156,7 +171,7 @@ export function StreamSessionDialog({
               />
             </div>
             <div>
-              <Label className="mb-1.5">Stream end</Label>
+              <Label className="mb-1.5">Planned stream end (Dhaka)</Label>
               <Input
                 type="datetime-local"
                 value={form.streamEndTime ?? ""}
@@ -164,7 +179,7 @@ export function StreamSessionDialog({
               />
             </div>
             <div>
-              <Label className="mb-1.5">Campaign start</Label>
+              <Label className="mb-1.5">Campaign start (Dhaka)</Label>
               <Input
                 type="datetime-local"
                 value={form.campaignStartTime ?? ""}
@@ -172,7 +187,7 @@ export function StreamSessionDialog({
               />
             </div>
             <div>
-              <Label className="mb-1.5">Campaign end</Label>
+              <Label className="mb-1.5">Campaign end (Dhaka)</Label>
               <Input
                 type="datetime-local"
                 value={form.campaignEndTime ?? ""}

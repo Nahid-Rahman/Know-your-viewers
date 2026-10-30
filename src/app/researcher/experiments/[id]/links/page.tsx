@@ -1,3 +1,4 @@
+import { requireExperimentPage } from "@/lib/study/researcher";
 import { notFound } from "next/navigation";
 import { Link2 } from "lucide-react";
 import {
@@ -16,6 +17,7 @@ export default async function TrackingLinksPage({
   params,
 }: PageProps<"/researcher/experiments/[id]/links">) {
   const { id } = await params;
+  await requireExperimentPage(id);
   const experiment = await getExperimentById(id);
   if (!experiment) notFound();
 

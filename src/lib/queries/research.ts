@@ -1,4 +1,5 @@
 import "server-only";
+import { formatStudyTime } from "@/lib/study/time";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import type {
@@ -103,9 +104,10 @@ const experimentInclude = {
   conditions: true,
 } as const;
 
-export async function getExperiments(researcherId?: string): Promise<ExperimentDTO[]> {
+/** By owner id, by an explicit list of accessible experiment ids, or (streamer views only) all. */
+export async function getExperiments(filter?: string | { ids: string[] }): Promise<ExperimentDTO[]> {
   const experiments = await prisma.experiment.findMany({
-    where: researcherId ? { researcherId } : undefined,
+    where: typeof filter === "string" ? { researcherId: filter } : filter ? { id: { in: filter.ids } } : undefined,
     include: experimentInclude,
     orderBy: { createdAt: "desc" },
   });
@@ -227,7 +229,7 @@ export async function getStreamSessions(experimentId: string): Promise<StreamSes
         streamTitle: s.streamTitle,
         streamStartTime: s.streamStartTime ? s.streamStartTime.toISOString() : null,
         streamStartLabel: s.streamStartTime
-          ? s.streamStartTime.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
+          ? formatStudyTime(s.streamStartTime)
           : "—",
         streamEndTime: s.streamEndTime ? s.streamEndTime.toISOString() : null,
         campaignStartTime: s.campaignStartTime ? s.campaignStartTime.toISOString() : null,
@@ -692,6 +694,8 @@ function computePageDurations(
 }
 
 export type ParticipantListFilters = {
+  /** Experiment ids the signed-in researcher may access (see accessibleExperimentIds). */
+  scope: string[];
   q?: string;
   experimentId?: string;
   streamerId?: string;
@@ -733,11 +737,11 @@ export type ParticipantListResult = {
 };
 
 /** Deliberately excludes emailOrPhone/phone — contact details live in a separate encrypted table and are never rendered in a list view. */
-export async function getParticipantRows(filters: ParticipantListFilters = {}): Promise<ParticipantListResult> {
+export async function getParticipantRows(filters: ParticipantListFilters): Promise<ParticipantListResult> {
   const page = Math.max(filters.page ?? 1, 1);
   const pageSize = Math.min(Math.max(filters.pageSize ?? 25, 1), 100);
 
-  const and: Prisma.ParticipantWhereInput[] = [];
+  const and: Prisma.ParticipantWhereInput[] = [{ experimentId: { in: filters.scope } }];
   if (filters.experimentId) and.push({ experimentId: filters.experimentId });
   if (filters.q) {
     and.push({
@@ -827,9 +831,9 @@ export async function getParticipantRows(filters: ParticipantListFilters = {}): 
 }
 
 /** Full research profile for one participant — the 7-section detail page reads straight off this. */
-export async function getParticipantDetail(participantId: string) {
-  const participant = await prisma.participant.findUnique({
-    where: { id: participantId },
+export async function getParticipantDetail(participantId: string, scope: string[]) {
+  const participant = await prisma.participant.findFirst({
+    where: { id: participantId, experimentId: { in: scope } },
     include: {
       experiment: { select: { title: true } },
       condition: { select: { name: true } },
@@ -1005,6 +1009,8 @@ export type ContactQueueRow = {
 };
 
 export type ContactQueueFilters = {
+  /** Experiment ids the signed-in researcher may access (see accessibleExperimentIds). */
+  scope: string[];
   q?: string;
   contactStatus?: ContactStatus;
   researcherAssignedId?: string;
@@ -1014,12 +1020,12 @@ export type ContactQueueFilters = {
 };
 
 export async function getContactQueue(
-  filters: ContactQueueFilters = {},
+  filters: ContactQueueFilters,
 ): Promise<{ rows: ContactQueueRow[]; total: number; page: number; pageSize: number }> {
   const page = filters.page ?? 1;
   const pageSize = filters.pageSize ?? 25;
 
-  const and: Prisma.ParticipantWhereInput[] = [{ contact: { isNot: null } }];
+  const and: Prisma.ParticipantWhereInput[] = [{ contact: { isNot: null } }, { experimentId: { in: filters.scope } }];
   if (filters.q) {
     and.push({
       OR: [
@@ -1094,6 +1100,8 @@ export type DebriefQueueRow = {
 };
 
 export type DebriefQueueFilters = {
+  /** Experiment ids the signed-in researcher may access (see accessibleExperimentIds). */
+  scope: string[];
   q?: string;
   debriefStatus?: DebriefStatus;
   page?: number;
@@ -1103,13 +1111,14 @@ export type DebriefQueueFilters = {
 const DEBRIEF_QUEUE_STATUSES: DebriefStatus[] = ["PENDING", "CONTACTED", "EXPLAINED", "UNREACHABLE"];
 
 export async function getDebriefQueue(
-  filters: DebriefQueueFilters = {},
+  filters: DebriefQueueFilters,
 ): Promise<{ rows: DebriefQueueRow[]; total: number; page: number; pageSize: number }> {
   const page = filters.page ?? 1;
   const pageSize = filters.pageSize ?? 25;
 
   const and: Prisma.ParticipantWhereInput[] = [
     { contact: { isNot: null } },
+    { experimentId: { in: filters.scope } },
     filters.debriefStatus
       ? filters.debriefStatus === "PENDING"
         ? { OR: [{ debrief: null }, { debrief: { debriefStatus: "PENDING" } }] }
@@ -1188,6 +1197,8 @@ export type InterviewQueueRow = {
 };
 
 export type InterviewQueueFilters = {
+  /** Experiment ids the signed-in researcher may access (see accessibleExperimentIds). */
+  scope: string[];
   q?: string;
   status?: InterviewCandidateStatus;
   page?: number;
@@ -1195,12 +1206,12 @@ export type InterviewQueueFilters = {
 };
 
 export async function getInterviewQueue(
-  filters: InterviewQueueFilters = {},
+  filters: InterviewQueueFilters,
 ): Promise<{ rows: InterviewQueueRow[]; total: number; page: number; pageSize: number }> {
   const page = filters.page ?? 1;
   const pageSize = filters.pageSize ?? 25;
 
-  const and: Prisma.ParticipantWhereInput[] = [{ contact: { isNot: null } }];
+  const and: Prisma.ParticipantWhereInput[] = [{ contact: { isNot: null } }, { experimentId: { in: filters.scope } }];
   if (filters.q) {
     and.push({
       OR: [
@@ -1280,22 +1291,25 @@ export type ResearchDatasetSummary = {
   excludedCount: number;
 };
 
-export async function getResearchDatasetSummary(): Promise<ResearchDatasetSummary> {
+export async function getResearchDatasetSummary(scope: string[]): Promise<ResearchDatasetSummary> {
+  const inScope = { experimentId: { in: scope } };
+  const pScope = { participant: inScope };
   const [totalParticipants, totalEvents, totalResponses, contactsOnFile, interviewsCompleted, excludedCount] =
     await Promise.all([
-      prisma.participant.count(),
-      prisma.engagementEvent.count(),
-      prisma.response.count(),
-      prisma.participantContact.count(),
-      prisma.interview.count({ where: { status: "COMPLETED" } }),
-      prisma.researchEligibility.count({ where: { eligible: false } }),
+      prisma.participant.count({ where: inScope }),
+      prisma.engagementEvent.count({ where: pScope }),
+      prisma.response.count({ where: pScope }),
+      prisma.participantContact.count({ where: pScope }),
+      prisma.interview.count({ where: { status: "COMPLETED", ...pScope } }),
+      prisma.researchEligibility.count({ where: { eligible: false, ...pScope } }),
     ]);
   return { totalParticipants, totalEvents, totalResponses, contactsOnFile, interviewsCompleted, excludedCount };
 }
 
 /** Main behavioral research dataset — never includes contact info, per the no-phone-in-the-default-export rule. */
-export async function getBehavioralDatasetRows() {
+export async function getBehavioralDatasetRows(scope: string[]) {
   const participants = await prisma.participant.findMany({
+    where: { experimentId: { in: scope } },
     include: {
       experiment: { select: { title: true } },
       condition: { select: { name: true } },
@@ -1338,8 +1352,9 @@ export async function getBehavioralDatasetRows() {
   });
 }
 
-export async function getSurveyResponseExportRows() {
+export async function getSurveyResponseExportRows(scope: string[]) {
   const responses = await prisma.response.findMany({
+    where: { participant: { experimentId: { in: scope } } },
     include: {
       participant: { select: { anonymousCode: true } },
       survey: { select: { title: true, questions: { select: { id: true, order: true, questionText: true } } } },
@@ -1365,8 +1380,9 @@ export async function getSurveyResponseExportRows() {
   });
 }
 
-export async function getEventExportRows() {
+export async function getEventExportRows(scope: string[]) {
   const events = await prisma.engagementEvent.findMany({
+    where: { participant: { experimentId: { in: scope } } },
     include: { participant: { select: { anonymousCode: true } } },
     orderBy: { timestamp: "asc" },
   });
@@ -1380,9 +1396,9 @@ export async function getEventExportRows() {
   }));
 }
 
-export async function getInterviewStatusExportRows() {
+export async function getInterviewStatusExportRows(scope: string[]) {
   const participants = await prisma.participant.findMany({
-    where: { interviewConsent: { isNot: null } },
+    where: { interviewConsent: { isNot: null }, experimentId: { in: scope } },
     include: {
       interviewConsent: true,
       interviews: { orderBy: { createdAt: "desc" }, take: 1 },
@@ -1411,9 +1427,9 @@ export async function getInterviewStatusExportRows() {
  * Handler, not here, so this reusable query module never becomes a place a future page
  * render could accidentally decrypt contact values from.
  */
-export async function getContactExportSourceRows() {
+export async function getContactExportSourceRows(scope: string[]) {
   return prisma.participant.findMany({
-    where: { contact: { isNot: null } },
+    where: { contact: { isNot: null }, experimentId: { in: scope } },
     include: {
       contact: true,
       streamer: { select: { displayName: true } },

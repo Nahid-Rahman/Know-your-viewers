@@ -3,11 +3,16 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@/generated/prisma/enums";
+import { AuthError } from "@/lib/auth-error";
+import { devAuthEmail } from "@/lib/dev-auth";
 
-export class AuthError extends Error {}
+export { AuthError };
 
 /** Resolves the signed-in Supabase user to our mirrored User row, or null. */
 export async function getCurrentUser() {
+  const devEmail = devAuthEmail();
+  if (devEmail) return prisma.user.findUnique({ where: { email: devEmail } });
+
   // Scaffold state: no Supabase project connected yet. Treat as signed-out
   // rather than crashing every protected page (see proxy.ts's same check).
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
