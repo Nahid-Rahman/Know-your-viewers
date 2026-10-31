@@ -27,10 +27,10 @@ async function main() {
       claimedCount: "247,000+",
       countdownSeconds: 23 * 3600 + 48 * 60 + 21,
       trustBadges: [
-        { icon: "★", title: "100% Official", description: "Verified reward programme" },
-        { icon: "🛡", title: "Secure & Safe", description: "No password needed" },
-        { icon: "🎁", title: "Real Rewards", description: "Credits, vouchers & bonus entries" },
-        { icon: "👥", title: "Trusted by Players", description: "Hundreds of thousands of claims" },
+        { icon: "🎓", title: "Research Study", description: "University study run with the streamer" },
+        { icon: "🛡", title: "Secure & Safe", description: "No password, PIN or OTP needed" },
+        { icon: "🎁", title: "BDT 100 bKash Draw", description: "Winners picked at random after the session" },
+        { icon: "📱", title: "Quick Entry", description: "Phone and age group — the rest is optional" },
       ],
       gameCategories: [
         {

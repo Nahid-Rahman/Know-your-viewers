@@ -19,7 +19,8 @@ export const homepageContentSchema = z.object({
 export type HomepageContent = z.infer<typeof homepageContentSchema>;
 
 export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
-  heroHeadline: "Viewer reward wheel",
+  // "**…**" renders in the brand gradient (RichHeadline); "\n" breaks lines.
+  heroHeadline: "SPIN FOR\nYOUR\n**VIEWER DROP**\nTODAY!",
   heroSubtext:
     "Spin the wheel and leave your phone number to enter the BDT 100 bKash prize draw for this stream. Winners are picked at random after the session.",
   howItWorks: [

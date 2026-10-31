@@ -6,6 +6,7 @@ import { homepageContentSchema, DEFAULT_HOMEPAGE_CONTENT } from "./sessions";
 import { entryState } from "./session-state";
 import { formatStudyTime } from "./time";
 import { getActiveStudySession } from "./visits";
+import { getSiteContent } from "@/lib/queries/research";
 import type { StudyHomeProps } from "@/features/study/study-home";
 import type { IdleHomeProps } from "@/features/study/idle-home";
 
@@ -18,6 +19,12 @@ const toReelItems = (items: { key: string; label: string; sub: string; tier: Stu
 
 /** Everything the public homepage needs, decided on the server with server time. */
 export async function loadPublicPage(now = new Date()): Promise<PublicPageState> {
+  // Trust badges and game categories stay site-wide CMS content (Settings → Stimulus Content).
+  const site = await getSiteContent();
+  const sections = {
+    trustBadges: (site?.trustBadges ?? []) as StudyHomeProps["sections"]["trustBadges"],
+    gameCategories: (site?.gameCategories ?? []) as StudyHomeProps["sections"]["gameCategories"],
+  };
   const session = await getActiveStudySession();
   // No session running: the full site stays visible with neutral defaults,
   // but nothing can be spun or submitted and no visit is recorded.
@@ -34,6 +41,7 @@ export async function loadPublicPage(now = new Date()): Promise<PublicPageState>
         reelItems: toReelItems(DEFAULT_REWARD_CONFIG.displayItems),
         statusTitle: "Entries open during the next collaborating stream",
         statusText: "Watch for the link in a collaborating streamer's stream description. The wheel and entry form open while the stream is live and for two hours after it ends.",
+        sections,
       },
     };
   }
@@ -56,6 +64,7 @@ export async function loadPublicPage(now = new Date()): Promise<PublicPageState>
         reelItems: toReelItems(reward.displayItems),
         statusTitle: `Entries for ${cfg.streamerDisplayName}'s session are closed`,
         statusText: `${state.deadline ? `Entries closed ${formatStudyTime(state.deadline)}. ` : ""}Thanks for watching — draw winners will be contacted by phone after the draw.`,
+        sections,
       },
     };
   }
@@ -88,7 +97,8 @@ export async function loadPublicPage(now = new Date()): Promise<PublicPageState>
         resultHeadline: reward.resultHeadline,
         resultExplanation: reward.resultExplanation,
       },
-      deadlineText: state.deadline ? `Entries close ${formatStudyTime(state.deadline)}` : null,
+      deadlineIso: state.deadline ? state.deadline.toISOString() : null,
+      sections,
       isTest: session.collectionMode === "TEST",
       notice,
     },
