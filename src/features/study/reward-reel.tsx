@@ -32,7 +32,7 @@ export function RewardReel({
   items: ReelItem[];
   target: string | null;
   landed: boolean;
-  onLanded: () => void;
+  onLanded?: () => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const offsetRef = useRef(2 * items.length * PITCH);
@@ -70,7 +70,7 @@ export function RewardReel({
         offsetRef.current = 2 * loop + idx * PITCH;
         if (trackRef.current) trackRef.current.style.transform = `translateX(calc(50% - ${TILE_W / 2}px - ${offsetRef.current}px))`;
         landedFor.current = target;
-        onLandedRef.current();
+        onLandedRef.current?.();
       }
     };
     raf = requestAnimationFrame(frame);

@@ -144,7 +144,7 @@ check("public: closed state after deadline", (await pub.content()).includes("are
 await shot(pub, "mobile-05-closed");
 await db.query(`UPDATE stream_sessions SET status = 'CLOSED' WHERE id = $1`, [sess.id]);
 const resp = await pub.goto(`${BASE}/`, { waitUntil: "networkidle0" });
-check("public: stable no-session page (no redirect loop)", resp?.status() === 200 && (await pub.content()).includes("No stream is running"));
+check("public: full idle page without form when no session (no redirect loop)", resp?.status() === 200 && (await pub.content()).includes("Entries open during the next collaborating stream") && !(await pub.content()).includes("entry-phone"));
 await shot(pub, "mobile-06-no-session");
 // restore for further manual testing
 await db.query(`UPDATE stream_sessions SET status = 'ACTIVE', "actualEndAt" = NULL, "entryDeadlineAt" = NULL WHERE id = $1`, [sess.id]);

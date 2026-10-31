@@ -1,34 +1,65 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { approvedNotice } from "./policy";
-import { parseRewardConfig } from "./reward";
+import { DEFAULT_REWARD_CONFIG, parseRewardConfig } from "./reward";
 import { homepageContentSchema, DEFAULT_HOMEPAGE_CONTENT } from "./sessions";
 import { entryState } from "./session-state";
 import { formatStudyTime } from "./time";
 import { getActiveStudySession } from "./visits";
 import type { StudyHomeProps } from "@/features/study/study-home";
+import type { IdleHomeProps } from "@/features/study/idle-home";
 
 export type PublicPageState =
-  | { kind: "none" }
-  | { kind: "closed"; streamerName: string; deadlineText: string | null }
+  | { kind: "idle"; props: IdleHomeProps }
   | { kind: "open"; props: Omit<StudyHomeProps, "refCode"> };
+
+const toReelItems = (items: { key: string; label: string; sub: string; tier: StudyHomeProps["reel"]["items"][number]["tier"] }[]) =>
+  items.map((i) => ({ key: i.key, label: i.label, sub: i.sub, tier: i.tier }));
 
 /** Everything the public homepage needs, decided on the server with server time. */
 export async function loadPublicPage(now = new Date()): Promise<PublicPageState> {
   const session = await getActiveStudySession();
-  if (!session?.currentConfig) return { kind: "none" };
+  // No session running: the full site stays visible with neutral defaults,
+  // but nothing can be spun or submitted and no visit is recorded.
+  if (!session?.currentConfig) {
+    return {
+      kind: "idle",
+      props: {
+        branding: null,
+        homepage: {
+          ...DEFAULT_HOMEPAGE_CONTENT,
+          heroSubtext:
+            "During a collaborating streamer's session you can spin the wheel and leave your phone number to enter a BDT 100 bKash prize draw. Winners are picked at random after each session.",
+        },
+        reelItems: toReelItems(DEFAULT_REWARD_CONFIG.displayItems),
+        statusTitle: "Entries open during the next collaborating stream",
+        statusText: "Watch for the link in a collaborating streamer's stream description. The wheel and entry form open while the stream is live and for two hours after it ends.",
+      },
+    };
+  }
   const cfg = session.currentConfig;
   const state = entryState(session, now);
+  const reward = parseRewardConfig(cfg.rewardConfig);
+  const homepage = homepageContentSchema.safeParse(cfg.homepageContent);
   if (!state.accepting) {
     return {
-      kind: "closed",
-      streamerName: cfg.streamerDisplayName,
-      deadlineText: state.deadline ? `Entries closed ${formatStudyTime(state.deadline)}` : null,
+      kind: "idle",
+      props: {
+        branding: {
+          streamerDisplayName: cfg.streamerDisplayName,
+          streamerImageUrl: cfg.streamerImageUrl,
+          welcomeText: cfg.welcomeText,
+          channelUrl: cfg.channelUrl,
+          platform: cfg.platform,
+        },
+        homepage: homepage.success ? homepage.data : DEFAULT_HOMEPAGE_CONTENT,
+        reelItems: toReelItems(reward.displayItems),
+        statusTitle: `Entries for ${cfg.streamerDisplayName}'s session are closed`,
+        statusText: `${state.deadline ? `Entries closed ${formatStudyTime(state.deadline)}. ` : ""}Thanks for watching — draw winners will be contacted by phone after the draw.`,
+      },
     };
   }
 
-  const reward = parseRewardConfig(cfg.rewardConfig);
-  const homepage = homepageContentSchema.safeParse(cfg.homepageContent);
   const policies = await prisma.studyPolicyDecision.findMany({ where: { experimentId: session.experimentId } });
   const records = policies.map((p) => ({ key: p.key, status: p.status, value: p.value }));
   const notice =
@@ -53,7 +84,7 @@ export async function loadPublicPage(now = new Date()): Promise<PublicPageState>
       },
       homepage: homepage.success ? homepage.data : DEFAULT_HOMEPAGE_CONTENT,
       reel: {
-        items: reward.displayItems.map((i) => ({ key: i.key, label: i.label, sub: i.sub, tier: i.tier })),
+        items: toReelItems(reward.displayItems),
         resultHeadline: reward.resultHeadline,
         resultExplanation: reward.resultExplanation,
       },
