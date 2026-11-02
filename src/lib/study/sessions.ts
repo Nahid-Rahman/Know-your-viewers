@@ -22,16 +22,16 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
   // "**…**" renders in the brand gradient (RichHeadline); "\n" breaks lines.
   heroHeadline: "SPIN FOR\nYOUR\n**VIEWER DROP**\nTODAY!",
   heroSubtext:
-    "Spin the wheel and leave your phone number to enter the BDT 100 bKash prize draw for this stream. Winners are picked at random after the session.",
+    "Spin the wheel and leave your phone number for a chance to win a prize from the prize pool. Winners are picked at random after the session.",
   howItWorks: [
     "Spin the reward wheel.",
     "Enter your phone number and age group. Other fields are optional.",
-    "After the session, winners are drawn at random and paid BDT 100 via bKash.",
+    "After the session, winners are drawn at random from the prize pool and contacted by phone.",
   ],
   faqItems: [
     {
       q: "Does everyone win?",
-      a: "No. Every valid entry goes into a random draw after the session, and only the selected winners receive BDT 100 via bKash.",
+      a: "No. Every valid entry goes into a random draw after the session, and only the selected winners receive a prize from the prize pool.",
     },
     {
       q: "Do optional fields improve my chances?",

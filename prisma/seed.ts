@@ -27,9 +27,9 @@ async function main() {
       claimedCount: "247,000+",
       countdownSeconds: 23 * 3600 + 48 * 60 + 21,
       trustBadges: [
-        { icon: "🎓", title: "Research Study", description: "University study run with the streamer" },
+        { icon: "👥", title: "Viewer Study", description: "How well do my viewers know me?" },
         { icon: "🛡", title: "Secure & Safe", description: "No password, PIN or OTP needed" },
-        { icon: "🎁", title: "BDT 100 bKash Draw", description: "Winners picked at random after the session" },
+        { icon: "🎁", title: "Win Exciting Prizes", description: "Spin for a chance to win a prize from the prize pool" },
         { icon: "📱", title: "Quick Entry", description: "Phone and age group — the rest is optional" },
       ],
       gameCategories: [

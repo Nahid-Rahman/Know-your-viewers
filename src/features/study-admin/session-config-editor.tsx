@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { saveSessionConfigAction } from "@/lib/actions/study-admin";
 import type { RewardConfig } from "@/lib/study/reward";
+import { StreamerImageUpload } from "./streamer-image-upload";
 
 export type ConfigEditorValue = {
   streamerDisplayName: string;
@@ -72,8 +73,8 @@ export function SessionConfigEditor({
           <Input id="c-platform" value={v.platform} maxLength={40} placeholder="YouTube / Facebook" onChange={(e) => set("platform", e.target.value)} />
         </div>
         <div>
-          <Label className="mb-1.5" htmlFor="c-img">Approved image URL</Label>
-          <Input id="c-img" value={v.streamerImageUrl} placeholder="https://… or /images/…" onChange={(e) => set("streamerImageUrl", e.target.value)} />
+          <Label className="mb-1.5">Streamer photo (shown on the homepage)</Label>
+          <StreamerImageUpload sessionId={sessionId} value={v.streamerImageUrl} onChange={(url) => set("streamerImageUrl", url)} disabled={disabled || pending} />
         </div>
         <div>
           <Label className="mb-1.5" htmlFor="c-channel">Channel URL</Label>

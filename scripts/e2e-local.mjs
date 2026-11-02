@@ -135,6 +135,28 @@ await admin.setViewport(MOBILE);
 await admin.goto(`${BASE}/researcher/experiments/${sess.experimentId}/streams/${sess.id}`, { waitUntil: "networkidle0" });
 await shot(admin, "admin-mobile-session");
 
+// Streamer photo upload from the admin config editor → shown in the homepage hero.
+await admin.setViewport(DESKTOP);
+await admin.goto(`${BASE}/researcher/experiments/${sess.experimentId}/streams/${sess.id}`, { waitUntil: "networkidle0" });
+const photoPage = await browser.newPage();
+await photoPage.setViewport({ width: 400, height: 400 });
+await photoPage.setContent('<div style="width:400px;height:400px;background:linear-gradient(135deg,#ff2d55,#7b2cff)"></div>');
+const photoPath = path.join(OUT, "test-streamer.png");
+await photoPage.screenshot({ path: photoPath });
+await photoPage.close();
+const fileInput = await admin.$('input[type="file"][aria-label="Upload streamer photo"]');
+await fileInput.uploadFile(photoPath);
+await admin.waitForFunction(() => [...document.querySelectorAll("img")].some((i) => i.src.includes("/api/media/")), { timeout: 20000 });
+await admin.evaluate(() => [...document.querySelectorAll("button")].find((b) => b.textContent?.includes("Save as new version"))?.click());
+await new Promise((r) => setTimeout(r, 2500));
+const home = await browser.newPage();
+await home.setViewport(DESKTOP);
+await home.goto(`${BASE}/`, { waitUntil: "networkidle0" });
+const heroImg = await home.$eval("section img", (i) => i.getAttribute("src")).catch(() => null);
+check("admin photo upload appears in the homepage hero", Boolean(heroImg?.startsWith("/api/media/")), heroImg ?? "none");
+await shot(home, "desktop-07-home-with-photo", false);
+await home.close();
+
 // Closed and no-session public states.
 await db.query(`UPDATE stream_sessions SET "actualEndAt" = (now() AT TIME ZONE 'UTC') - interval '3 hours', "entryDeadlineAt" = (now() AT TIME ZONE 'UTC') - interval '1 hour' WHERE id = $1`, [sess.id]);
 const pub = await browser.newPage();
@@ -145,6 +167,7 @@ await shot(pub, "mobile-05-closed");
 await db.query(`UPDATE stream_sessions SET status = 'CLOSED' WHERE id = $1`, [sess.id]);
 const resp = await pub.goto(`${BASE}/`, { waitUntil: "networkidle0" });
 check("public: full idle page without form when no session (no redirect loop)", resp?.status() === 200 && (await pub.content()).includes("Entries open during the next collaborating stream") && !(await pub.content()).includes("entry-phone"));
+check("public: idle page shows the last streamer", (await pub.content()).includes("/api/media/"));
 await shot(pub, "mobile-06-no-session");
 // restore for further manual testing
 await db.query(`UPDATE stream_sessions SET status = 'ACTIVE', "actualEndAt" = NULL, "entryDeadlineAt" = NULL WHERE id = $1`, [sess.id]);

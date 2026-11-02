@@ -44,11 +44,11 @@ export type RewardItem = z.infer<typeof rewardItemSchema>;
  */
 export const DEFAULT_REWARD_CONFIG: RewardConfig = {
   mechanism: "FIXED",
-  displayItems: [{ key: "bkash_draw_entry", label: "bKash Prize Draw Entry", sub: "BDT 100 draw", tier: "premium" }],
-  fixedResultKey: "bkash_draw_entry",
-  resultHeadline: "You're entered into the BDT 100 bKash prize draw",
+  displayItems: [{ key: "prize_draw_entry", label: "Prize Draw Entry", sub: "Prize pool", tier: "premium" }],
+  fixedResultKey: "prize_draw_entry",
+  resultHeadline: "You're entered into the prize draw",
   resultExplanation:
-    "Submitting this form enters you into a random draw held after the session ends. Not every entrant wins — selected winners receive BDT 100 via bKash. We will never ask for your bKash PIN, OTP or password.",
+    "Submitting this form enters you into a random draw held after the session ends. Not every entrant wins — selected winners receive a prize from the prize pool. We will never ask for your bKash PIN, OTP or password.",
 };
 
 export function parseRewardConfig(value: unknown): RewardConfig {

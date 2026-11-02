@@ -29,14 +29,29 @@ export async function loadPublicPage(now = new Date()): Promise<PublicPageState>
   // No session running: the full site stays visible with neutral defaults,
   // but nothing can be spun or submitted and no visit is recorded.
   if (!session?.currentConfig) {
+    // Show the most recent study session's streamer, if there has been one.
+    const last = await prisma.streamSession.findFirst({
+      where: { sessionType: "STUDY", currentConfigId: { not: null }, activatedAt: { not: null } },
+      include: { currentConfig: true },
+      orderBy: { activatedAt: "desc" },
+    });
+    const lastCfg = last?.currentConfig;
     return {
       kind: "idle",
       props: {
-        branding: null,
+        branding: lastCfg
+          ? {
+              streamerDisplayName: lastCfg.streamerDisplayName,
+              streamerImageUrl: lastCfg.streamerImageUrl,
+              welcomeText: lastCfg.welcomeText,
+              channelUrl: lastCfg.channelUrl,
+              platform: lastCfg.platform,
+            }
+          : null,
         homepage: {
           ...DEFAULT_HOMEPAGE_CONTENT,
           heroSubtext:
-            "During a collaborating streamer's session you can spin the wheel and leave your phone number to enter a BDT 100 bKash prize draw. Winners are picked at random after each session.",
+            "During a collaborating streamer's session you can spin the wheel and leave your phone number for a chance to win a prize from the prize pool. Winners are picked at random after each session.",
         },
         reelItems: toReelItems(DEFAULT_REWARD_CONFIG.displayItems),
         statusTitle: "Entries open during the next collaborating stream",

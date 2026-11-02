@@ -1442,3 +1442,18 @@ model RateLimitBucket {
 
   @@map("rate_limit_buckets")
 }
+
+// Images uploaded from the researcher panel (e.g. streamer photos for the
+// homepage). Stored in the database — already resized client-side and
+// size-limited server-side — and served by /api/media/[id].
+model MediaAsset {
+  id          String   @id @default(uuid())
+  mimeType    String
+  bytes       Bytes
+  sizeBytes   Int
+  purpose     String
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@map("media_assets")
+}

@@ -30,6 +30,7 @@ import {
 import { retentionRun } from "@/lib/study/retention";
 import { POLICY_KEYS, type PolicyKey } from "@/lib/study/policy";
 import { parseStudyLocal } from "@/lib/study/time";
+import { storeImage } from "@/lib/study/media";
 
 type Result<T = undefined> = { ok: true; data: T } | { error: string };
 
@@ -56,6 +57,23 @@ export async function saveSessionConfigAction(sessionId: string, input: SessionC
     const c = await saveSessionConfig(a, sessionId, input);
     return { version: c.version };
   }, [ADMIN]);
+}
+
+/**
+ * Uploads a streamer photo for a session's homepage. Returns the image path;
+ * it takes effect when the config is saved (a new config version), and also
+ * becomes the streamer's default photo for future sessions.
+ */
+export async function uploadStreamerImageAction(sessionId: string, formData: FormData) {
+  return run(async (a) => {
+    const session = await getAccessibleSession(a, sessionId, "write");
+    const file = formData.get("file");
+    if (!(file instanceof Blob)) throw new StudyRuleError("Choose an image to upload.");
+    const url = await storeImage(file, "streamer-photo", a.id);
+    await prisma.streamer.update({ where: { id: session.streamerId }, data: { imageUrl: url } });
+    await audit(prisma, { actorId: a.id, action: "STREAMER_IMAGE_UPLOADED", entityType: "StreamSession", entityId: sessionId, experimentId: session.experimentId });
+    return { url };
+  });
 }
 
 export async function activateSessionAction(sessionId: string) {

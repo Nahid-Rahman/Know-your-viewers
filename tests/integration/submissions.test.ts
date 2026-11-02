@@ -129,15 +129,15 @@ describe("submission and duplicates", () => {
     const v = await newVisit();
     const spin1 = await spinForVisit(v.visitorId, v.visit.id);
     const spin2 = await spinForVisit(v.visitorId, v.visit.id);
-    expect(spin1).toMatchObject({ ok: true, resultKey: "bkash_draw_entry" });
-    expect(spin2).toMatchObject({ ok: true, repeated: true, resultKey: "bkash_draw_entry" });
+    expect(spin1).toMatchObject({ ok: true, resultKey: "prize_draw_entry" });
+    expect(spin2).toMatchObject({ ok: true, repeated: true, resultKey: "prize_draw_entry" });
     const r = await submitEntryForVisit({
       visitorId: v.visitorId, visitId: v.visit.id, idempotencyKey: key(),
       values: { ...validEntry(), rewardLabel: "iPhone 17", rewardRarity: "premium", resultKey: "jackpot" },
     });
     expect(r.ok).toBe(true);
     const s = await prisma.submission.findFirstOrThrow({ include: { spinOutcome: true } });
-    expect(s.spinOutcome?.resultKey).toBe("bkash_draw_entry");
+    expect(s.spinOutcome?.resultKey).toBe("prize_draw_entry");
     expect(await prisma.spinOutcome.count()).toBe(1);
   });
 
