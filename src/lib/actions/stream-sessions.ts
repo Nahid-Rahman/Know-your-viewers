@@ -68,6 +68,15 @@ export async function createStreamSession(
     throw err;
   }
 
+  const streamer = await prisma.streamer.findUnique({ where: { id: input.streamerId }, select: { id: true } });
+  if (!streamer) return { error: "Pick a streamer." };
+  // Picking a streamer for a session assigns them to the experiment if needed.
+  await prisma.experimentStreamer.upsert({
+    where: { experimentId_streamerId: { experimentId, streamerId: streamer.id } },
+    update: {},
+    create: { experimentId, streamerId: streamer.id },
+  });
+
   const sessionType = input.sessionType === "NORMAL_BASELINE" ? "NORMAL_BASELINE" : "STUDY";
   const created = await prisma.streamSession.create({
     data: { experimentId, ...toData(input), sessionType, status: "DRAFT", collectionMode: "TEST" },

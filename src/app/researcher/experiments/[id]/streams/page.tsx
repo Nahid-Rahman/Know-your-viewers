@@ -17,7 +17,9 @@ export default async function StreamsPage({ params }: PageProps<"/researcher/exp
   if (!experiment) notFound();
 
   const [sessions, allStreamers] = await Promise.all([getStudySessions(id), getStreamers()]);
-  const assignedStreamers = allStreamers.filter((s) => experiment.assignedStreamerIds.includes(s.id));
+  // Every non-inactive streamer can be picked; creating a session assigns
+  // the streamer to this experiment automatically.
+  const pickableStreamers = allStreamers.filter((s) => s.status !== "INACTIVE");
 
   return (
     <div>
@@ -26,7 +28,7 @@ export default async function StreamsPage({ params }: PageProps<"/researcher/exp
           Sessions run one at a time. <strong>B — Study</strong> sessions get the website (same URL, streamer-branded); <strong>A — Normal</strong>{" "}
           sessions have no website and only platform metrics. Times are Asia/Dhaka.
         </p>
-        <StreamSessionDialog experimentId={id} streamers={assignedStreamers} triggerLabel="New session" />
+        <StreamSessionDialog experimentId={id} streamers={pickableStreamers} triggerLabel="New session" />
       </div>
 
       {sessions.length === 0 ? (
