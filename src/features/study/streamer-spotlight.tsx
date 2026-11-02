@@ -22,7 +22,7 @@ export function StreamerSpotlight({ branding, className }: { branding: StudyBran
     .toUpperCase();
   return (
     <div className={cn("flex flex-col items-center", className)}>
-      <div className="relative flex size-72 items-center justify-center sm:size-80">
+      <div className="relative flex size-80 items-center justify-center sm:size-96 lg:size-[26rem]">
         <div
           className="absolute inset-0 rounded-full"
           style={{
@@ -41,7 +41,7 @@ export function StreamerSpotlight({ branding, className }: { branding: StudyBran
           }}
           aria-hidden
         />
-        <div className="animate-pulse-glow relative size-52 overflow-hidden rounded-full border-4 border-primary/70 sm:size-60">
+        <div className="animate-pulse-glow relative size-60 overflow-hidden rounded-full border-4 border-primary/70 sm:size-72 lg:size-80">
           {branding.streamerImageUrl ? (
             <img src={branding.streamerImageUrl} alt={branding.streamerDisplayName} className="size-full object-cover" referrerPolicy="no-referrer" />
           ) : (
@@ -67,7 +67,7 @@ export function StreamerSpotlight({ branding, className }: { branding: StudyBran
       <p className="mt-4 text-[11px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
         {branding.platform ? `${branding.platform} stream` : "Live stream"}
       </p>
-      <p className="font-display text-3xl font-bold break-words text-center">{branding.streamerDisplayName}</p>
+      <p className="font-display text-3xl font-bold break-words text-center lg:text-4xl">{branding.streamerDisplayName}</p>
       {branding.channelUrl && (
         <a
           href={branding.channelUrl}
