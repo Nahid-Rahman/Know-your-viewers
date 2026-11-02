@@ -65,7 +65,7 @@ export function StreamSessionDialog({
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  async function handleSave() {
+  async function handleSave(startNow = false) {
     if (!form.streamerId) {
       toast.error("Pick a streamer.");
       return;
@@ -77,14 +77,16 @@ export function StreamSessionDialog({
     setPending(true);
     const result = session
       ? await updateStreamSession(session.id, form)
-      : await createStreamSession(experimentId!, form);
+      : await createStreamSession(experimentId!, form, { startNow });
     setPending(false);
 
     if ("error" in result) {
       toast.error(result.error);
       return;
     }
-    toast.success(session ? "Stream session updated." : "Stream session created.");
+    const warning = "warning" in result ? (result.warning as string | undefined) : undefined;
+    if (warning) toast.warning(warning, { duration: 10000 });
+    else toast.success(session ? "Stream session updated." : startNow ? "Session started — the homepage now shows it." : "Stream session created.");
     setOpen(false);
     router.refresh();
   }
@@ -170,6 +172,7 @@ export function StreamSessionDialog({
                 onChange={(e) => set("streamStartTime", e.currentTarget.value)}
               />
             </div>
+{session && (
             <div>
               <Label className="mb-1.5">Planned stream end (Dhaka)</Label>
               <Input
@@ -178,6 +181,8 @@ export function StreamSessionDialog({
                 onChange={(e) => set("streamEndTime", e.currentTarget.value)}
               />
             </div>
+            )}
+{session && (
             <div>
               <Label className="mb-1.5">Campaign start (Dhaka)</Label>
               <Input
@@ -186,6 +191,8 @@ export function StreamSessionDialog({
                 onChange={(e) => set("campaignStartTime", e.currentTarget.value)}
               />
             </div>
+            )}
+{session && (
             <div>
               <Label className="mb-1.5">Campaign end (Dhaka)</Label>
               <Input
@@ -194,6 +201,7 @@ export function StreamSessionDialog({
                 onChange={(e) => set("campaignEndTime", e.currentTarget.value)}
               />
             </div>
+            )}
             <div className="sm:col-span-2">
               <Label className="mb-1.5">Estimated viewer count</Label>
               <Input
@@ -220,9 +228,24 @@ export function StreamSessionDialog({
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button disabled={pending} onClick={handleSave} className="bg-gradient-primary text-white hover:opacity-90">
+            <Button
+              disabled={pending}
+              onClick={() => handleSave(false)}
+              variant={!session && form.sessionType !== "NORMAL_BASELINE" ? "outline" : undefined}
+              className={!session && form.sessionType !== "NORMAL_BASELINE" ? undefined : "bg-gradient-primary text-white hover:opacity-90"}
+            >
               {pending ? "Saving..." : session ? "Save changes" : "Create"}
             </Button>
+            {!session && form.sessionType !== "NORMAL_BASELINE" && (
+              <Button
+                disabled={pending}
+                onClick={() => handleSave(true)}
+                className="bg-gradient-primary text-white hover:opacity-90"
+                title="Creates the session, makes it the public homepage and records the actual start as now"
+              >
+                {pending ? "Starting..." : "Create & start now"}
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>

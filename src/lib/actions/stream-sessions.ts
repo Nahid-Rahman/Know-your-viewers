@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole, AuthError } from "@/lib/auth";
-import { assertSessionDeletable, defaultConfigInputFor, saveSessionConfig, StudyRuleError } from "@/lib/study/sessions";
+import { activateSession, assertSessionDeletable, defaultConfigInputFor, recordActualTime, saveSessionConfig, StudyRuleError } from "@/lib/study/sessions";
 import { parseStudyLocal } from "@/lib/study/time";
 
 async function requireOwnedExperiment(experimentId: string) {
@@ -58,7 +58,8 @@ function toData(input: StreamSessionInput) {
 export async function createStreamSession(
   experimentId: string,
   input: StreamSessionInput,
-): Promise<{ error: string } | { ok: true }> {
+  opts: { startNow?: boolean } = {},
+): Promise<{ error: string } | { ok: true; warning?: string }> {
   let researcher;
   try {
     researcher = await requireRole("RESEARCHER");
@@ -87,8 +88,23 @@ export async function createStreamSession(
     await saveSessionConfig(researcher, created.id, await defaultConfigInputFor(created.id));
   }
 
+  // "Create & start now": make it the public session and record the actual
+  // start as this moment. If activation is refused (e.g. another session is
+  // still active) the session is kept as a draft and the reason is returned.
+  let warning: string | undefined;
+  if (opts.startNow && sessionType === "STUDY") {
+    try {
+      await activateSession(researcher, created.id);
+      await recordActualTime(researcher, created.id, "actualStartAt", new Date(), null);
+    } catch (err) {
+      if (!(err instanceof StudyRuleError)) throw err;
+      warning = `Session created as a draft but not started: ${err.message}`;
+    }
+  }
+
   revalidatePath(`/researcher/experiments/${experimentId}/streams`);
-  return { ok: true };
+  revalidatePath("/");
+  return { ok: true, warning };
 }
 
 export async function updateStreamSession(
