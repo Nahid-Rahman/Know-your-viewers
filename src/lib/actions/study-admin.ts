@@ -10,6 +10,7 @@ import {
   activateSession,
   archiveSession,
   closeSessionEntries,
+  defaultConfigInputFor,
   recordActualTime,
   saveSessionConfig,
   setCollectionMode,
@@ -74,6 +75,16 @@ export async function uploadStreamerImageAction(sessionId: string, formData: For
     await audit(prisma, { actorId: a.id, action: "STREAMER_IMAGE_UPLOADED", entityType: "StreamSession", entityId: sessionId, experimentId: session.experimentId });
     return { url };
   });
+}
+
+/** For study sessions created before configs existed: create version 1 from honest defaults. */
+export async function createDefaultConfigAction(sessionId: string) {
+  return run(async (a) => {
+    const session = await getAccessibleSession(a, sessionId, "write");
+    if (session.sessionType !== "STUDY") throw new StudyRuleError("Normal (A) sessions have no website configuration.");
+    if (session.currentConfigId) throw new StudyRuleError("This session already has a configuration.");
+    await saveSessionConfig(a, sessionId, await defaultConfigInputFor(sessionId));
+  }, [ADMIN]);
 }
 
 export async function activateSessionAction(sessionId: string) {

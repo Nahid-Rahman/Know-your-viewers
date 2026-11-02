@@ -14,6 +14,7 @@ import {
   activateSessionAction,
   archiveSessionAction,
   closeSessionAction,
+  createDefaultConfigAction,
   setCollectionModeAction,
 } from "@/lib/actions/study-admin";
 import { ActionButton } from "@/features/study-admin/action-button";
@@ -282,6 +283,16 @@ export default async function SessionDetailPage({ params, searchParams }: PagePr
             </div>
             <TrafficChart series={traffic.series} markers={markers} />
           </div>
+        </Card>
+      )}
+
+      {isStudy && !cfg && session.status !== "ARCHIVED" && (
+        <Card title="Homepage & wheel configuration">
+          <p className="mb-3 text-sm text-muted-foreground">
+            This session was created before homepage configurations existed. Create one to set the streamer&apos;s name, photo and
+            homepage text.
+          </p>
+          <ActionButton action={createDefaultConfigAction.bind(null, sessionId)} label="Create homepage configuration" variant="default" successMessage="Configuration created." />
         </Card>
       )}
 
