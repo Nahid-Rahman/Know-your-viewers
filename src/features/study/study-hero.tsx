@@ -60,7 +60,8 @@ export function StudyHero({
           </p>
         </div>
 
-        <div className="relative flex justify-center md:justify-end">
+        {/* On phones the streamer comes first so viewers see who they're watching without scrolling. */}
+        <div className="relative order-first flex justify-center md:order-none md:justify-end">
           {branding ? <StreamerSpotlight branding={branding} /> : <RewardOrb />}
         </div>
       </div>
