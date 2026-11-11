@@ -366,14 +366,67 @@
     animation: tile-land 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
+  /* Wheel result reveal: card pop, confetti burst, shimmering label. */
+  @keyframes result-pop {
+    0% {
+      opacity: 0;
+      transform: translateY(16px) scale(0.8);
+    }
+    60% {
+      opacity: 1;
+      transform: translateY(0) scale(1.06);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes confetti {
+    0% {
+      opacity: 1;
+      transform: translate(0, 0) rotate(0deg) scale(1);
+    }
+    80% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: translate(var(--cx), calc(var(--cy) + 60px)) rotate(var(--cr)) scale(0.6);
+    }
+  }
+  @keyframes shine {
+    to {
+      background-position: -250% 0;
+    }
+  }
+  .animate-result-pop {
+    animation: result-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  .animate-confetti {
+    opacity: 0;
+    animation: confetti 1.4s cubic-bezier(0.15, 0.7, 0.4, 1) both;
+  }
+  .animate-shine {
+    animation: shine 2.4s linear infinite;
+  }
+  .animate-spin-fast {
+    animation: spin-slow 3s linear infinite;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .animate-spin-slow,
     .animate-pulse-glow,
     .animate-float-bob,
     .animate-twinkle,
     .animate-tick-flash,
-    .animate-tile-land {
+    .animate-tile-land,
+    .animate-result-pop,
+    .animate-shine,
+    .animate-spin-fast {
       animation: none;
+    }
+    .animate-confetti {
+      display: none;
     }
   }
 }

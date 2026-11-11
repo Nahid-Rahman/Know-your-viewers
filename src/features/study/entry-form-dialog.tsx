@@ -88,15 +88,13 @@ export function EntryFormDialog({
       <DialogContent className="max-w-lg sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="font-display text-xl font-bold">Enter the prize draw</DialogTitle>
-          <DialogDescription>
-            {result ? (
-              <>
-                <span className="font-semibold text-foreground">Wheel result: {result.label}.</span> {result.explanation}
-              </>
-            ) : (
-              "Leave your details to enter the draw."
-            )}
-          </DialogDescription>
+          {result && (
+            <div className="mt-2 rounded-2xl border border-accent-green/50 bg-accent-green/10 px-4 py-3 text-center shadow-[0_0_32px_-12px_var(--green)]">
+              <p className="text-[10px] font-black tracking-[0.3em] text-accent-green uppercase">🎉 Your wheel result</p>
+              <p className="mt-1 font-display text-2xl font-black text-accent-green">{result.label}</p>
+            </div>
+          )}
+          <DialogDescription>{result ? result.explanation : "Leave your details to enter the draw."}</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>

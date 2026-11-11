@@ -5,6 +5,7 @@ import { EyebrowLabel } from "@/components/common/eyebrow-label";
 import { Button } from "@/components/ui/button";
 import { spinWheel } from "@/lib/actions/study-public";
 import { RewardReel, type ReelItem } from "./reward-reel";
+import { ResultReveal } from "./result-reveal";
 import { EntryFormDialog } from "./entry-form-dialog";
 import { useSectionViewed, useStudyVisit } from "./use-study-visit";
 import type { StudyBranding } from "./streamer-header";
@@ -68,7 +69,7 @@ export function StudyHome(props: StudyHomeProps) {
     window.setTimeout(() => {
       setFormOpen(true);
       track({ type: "FORM_OPENED" });
-    }, 400);
+    }, 2200);
   }
 
   return (
@@ -90,7 +91,7 @@ export function StudyHome(props: StudyHomeProps) {
       <TrustBadgesSection badges={props.sections.trustBadges} />
       <CategoriesSection gameCategories={props.sections.gameCategories} />
 
-      <section ref={rewardRef} id="spin" className="scroll-mt-[69px] border-y border-border bg-background-deep/40 py-16">
+      <section ref={rewardRef} id="spin" className="scroll-mt-[69px] overflow-x-clip border-y border-border bg-background-deep/40 py-16">
         <div className="mx-auto w-full max-w-6xl px-4 text-center sm:px-6">
           <EyebrowLabel variant="primary" glyph="🎰" className="mb-4">
             ROULETTE
@@ -104,6 +105,7 @@ export function StudyHome(props: StudyHomeProps) {
           <div className="mt-10">
             <RewardReel items={props.reel.items} target={target?.key ?? null} landed={landed} onLanded={handleLanded} />
           </div>
+          {landed && target && <ResultReveal label={target.label} headline={props.reel.resultHeadline} />}
           <Button
             size="lg"
             onClick={handleSpin}
@@ -121,7 +123,7 @@ export function StudyHome(props: StudyHomeProps) {
           <p className="mx-auto mt-4 max-w-md text-xs text-muted-foreground" aria-live="polite">
             {spinError ??
               (landed && target
-                ? `Wheel result: ${target.label}. ${props.reel.resultHeadline}.`
+                ? "Enter the draw with your details — winners are picked at random after the session."
                 : "The wheel result is shown for fun — draw winners are chosen at random after the session.")}
           </p>
         </div>
