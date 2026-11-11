@@ -881,7 +881,7 @@ model SessionConfig {
   platform            String?
   // { heroHeadline, heroSubtext, howItWorks: string[], faqItems: {q,a}[] }
   homepageContent     Json
-  // { mechanism: "FIXED" | "WEIGHTED_RANDOM", displayItems: {key,label,sub,tier,weight?}[],
+  // { mechanism: "FIXED", fixedResultKey: "bkash_reward", displayItems: {key,label,sub,tier}[],
   //   fixedResultKey?, resultHeadline, resultExplanation }
   rewardConfig        Json
   createdById         String?

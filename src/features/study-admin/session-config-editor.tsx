@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { saveSessionConfigAction } from "@/lib/actions/study-admin";
-import type { RewardConfig } from "@/lib/study/reward";
+import { BKASH_REWARD_KEY, type RewardConfig } from "@/lib/study/reward";
 import { StreamerImageUpload } from "./streamer-image-upload";
 
 export type ConfigEditorValue = {
@@ -132,42 +132,15 @@ export function SessionConfigEditor({
             sessions; a LIVE session can&apos;t be activated until the decision is approved.
           </p>
         )}
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <div>
-            <Label className="mb-1.5" htmlFor="c-mech">Mechanism (recorded with every spin)</Label>
-            <select
-              id="c-mech"
-              className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
-              value={v.rewardConfig.mechanism}
-              onChange={(e) => setReward("mechanism", e.target.value as RewardConfig["mechanism"])}
-            >
-              <option value="FIXED">Fixed — always lands on one configured item</option>
-              <option value="WEIGHTED_RANDOM">Weighted random — server picks by weight</option>
-            </select>
-          </div>
-          {v.rewardConfig.mechanism === "FIXED" && (
-            <div>
-              <Label className="mb-1.5" htmlFor="c-fixed">Fixed result</Label>
-              <select
-                id="c-fixed"
-                className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
-                value={v.rewardConfig.fixedResultKey ?? ""}
-                onChange={(e) => setReward("fixedResultKey", e.target.value)}
-              >
-                {items.map((i) => (
-                  <option key={i.key} value={i.key}>
-                    {i.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Result is locked: every spin lands on <span className="font-semibold">bKash Reward</span> (recorded as FIXED). The other items
+          are display only.
+        </p>
         <div className="mt-3 space-y-2">
           <p className="text-xs text-muted-foreground">Displayed items (key must be lowercase letters/digits/_ and unique)</p>
           {items.map((it, i) => (
-            <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1.5fr_1fr_1fr_0.6fr_auto]">
-              <Input aria-label="Key" value={it.key} onChange={(e) => setReward("displayItems", items.map((x, j) => (j === i ? { ...x, key: e.target.value } : x)))} />
+            <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1.5fr_1fr_1fr_auto]">
+              <Input aria-label="Key" value={it.key} disabled={it.key === BKASH_REWARD_KEY} onChange={(e) => setReward("displayItems", items.map((x, j) => (j === i ? { ...x, key: e.target.value } : x)))} />
               <Input aria-label="Label" value={it.label} maxLength={60} onChange={(e) => setReward("displayItems", items.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
               <Input aria-label="Sub-label" value={it.sub} maxLength={40} onChange={(e) => setReward("displayItems", items.map((x, j) => (j === i ? { ...x, sub: e.target.value } : x)))} />
               <select
@@ -180,16 +153,7 @@ export function SessionConfigEditor({
                   <option key={t} value={t}>{t}</option>
                 ))}
               </select>
-              <Input
-                aria-label="Weight"
-                type="number"
-                min={0}
-                placeholder="weight"
-                disabled={v.rewardConfig.mechanism !== "WEIGHTED_RANDOM"}
-                value={it.weight ?? ""}
-                onChange={(e) => setReward("displayItems", items.map((x, j) => (j === i ? { ...x, weight: e.target.value === "" ? undefined : Number(e.target.value) } : x)))}
-              />
-              <Button type="button" variant="ghost" size="sm" aria-label="Remove item" disabled={items.length <= 1} onClick={() => setReward("displayItems", items.filter((_, j) => j !== i))}>
+              <Button type="button" variant="ghost" size="sm" aria-label="Remove item" disabled={items.length <= 1 || it.key === BKASH_REWARD_KEY} onClick={() => setReward("displayItems", items.filter((_, j) => j !== i))}>
                 <Trash2 className="size-4" />
               </Button>
             </div>

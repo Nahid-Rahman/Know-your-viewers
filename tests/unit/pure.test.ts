@@ -4,7 +4,7 @@ import { parseStudyLocal, toStudyLocalInput } from "@/lib/study/time";
 import { estimateActiveMs } from "@/lib/study/activity";
 import { entryState, entryDeadlineFor } from "@/lib/study/session-state";
 import { escapeCsvValue } from "@/lib/csv";
-import { selectSpinResult, DEFAULT_REWARD_CONFIG, rewardConfigSchema } from "@/lib/study/reward";
+import { selectSpinResult, DEFAULT_REWARD_CONFIG, rewardConfigSchema, parseRewardConfig } from "@/lib/study/reward";
 import { selectWithoutReplacement } from "@/lib/study/draw";
 import { entryFormSchema } from "@/lib/study/submission-schema";
 import { approvedWinnerCount, blockingPoliciesForLive } from "@/lib/study/policy";
@@ -113,26 +113,29 @@ describe("CSV export safety", () => {
 });
 
 describe("reward selection", () => {
-  it("a FIXED mechanism always returns the configured item and says so", () => {
+  it("always lands on the bKash reward and says so", () => {
     for (let i = 0; i < 20; i++) {
-      const r = selectSpinResult(DEFAULT_REWARD_CONFIG, () => i);
-      expect(r).toMatchObject({ mechanism: "FIXED", item: { key: "prize_draw_entry" } });
+      const r = selectSpinResult({ ...DEFAULT_REWARD_CONFIG, resultHeadline: `h${i}` });
+      expect(r).toMatchObject({ mechanism: "FIXED", item: { key: "bkash_reward" } });
     }
   });
-  it("weighted selection respects weights", () => {
-    const cfg = rewardConfigSchema.parse({
+  it("refuses any config that doesn't land on the bKash reward", () => {
+    const base = { ...DEFAULT_REWARD_CONFIG };
+    expect(rewardConfigSchema.safeParse(base).success).toBe(true);
+    expect(rewardConfigSchema.safeParse({ ...base, mechanism: "WEIGHTED_RANDOM" }).success).toBe(false);
+    expect(rewardConfigSchema.safeParse({ ...base, fixedResultKey: "gift_card" }).success).toBe(false);
+    expect(
+      rewardConfigSchema.safeParse({ ...base, displayItems: base.displayItems.filter((i) => i.key !== "bkash_reward") }).success,
+    ).toBe(false);
+  });
+  it("legacy or tampered configs still land on the bKash reward", () => {
+    const legacy = {
       mechanism: "WEIGHTED_RANDOM",
-      displayItems: [
-        { key: "a", label: "A", weight: 1 },
-        { key: "b", label: "B", weight: 0 },
-        { key: "c", label: "C", weight: 3 },
-      ],
+      displayItems: [{ key: "gift_card", label: "Gift Card", weight: 5 }],
       resultHeadline: "x",
       resultExplanation: "y",
-    });
-    expect(selectSpinResult(cfg, () => 0).item.key).toBe("a");
-    expect(selectSpinResult(cfg, () => 1).item.key).toBe("c");
-    expect(selectSpinResult(cfg, () => 3).item.key).toBe("c");
+    };
+    expect(selectSpinResult(parseRewardConfig(legacy)).item.key).toBe("bkash_reward");
   });
 });
 

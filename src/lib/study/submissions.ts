@@ -1,5 +1,4 @@
 import "server-only";
-import { randomInt } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { encryptContact } from "@/lib/crypto";
 import { Prisma } from "@/generated/prisma/client";
@@ -39,7 +38,7 @@ export async function spinForVisit(visitorId: string, visitId: string, now = new
   if (existing) return { ok: true as const, resultKey: existing.resultKey, resultLabel: existing.resultLabel, repeated: true };
 
   const config = await prisma.sessionConfig.findUniqueOrThrow({ where: { id: visit.configId } });
-  const { item, mechanism } = selectSpinResult(parseRewardConfig(config.rewardConfig), randomInt);
+  const { item, mechanism } = selectSpinResult(parseRewardConfig(config.rewardConfig));
   try {
     const spin = await prisma.$transaction(async (tx) => {
       const created = await tx.spinOutcome.create({
