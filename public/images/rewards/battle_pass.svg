@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 240">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="75%">
+      <stop offset="0" stop-color="#5c1520"/>
+      <stop offset="1" stop-color="#14060a"/>
+    </radialGradient>
+    <linearGradient id="ticket" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff5468"/>
+      <stop offset="1" stop-color="#b3122a"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe27a"/>
+      <stop offset="1" stop-color="#e0a51b"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="240" fill="url(#bg)"/>
+  <circle cx="200" cy="120" r="96" fill="#ff5468" opacity="0.16"/>
+  <!-- ticket with notches -->
+  <path d="M84 70 H316 a10 10 0 0 0 0 0 V102 a18 18 0 0 0 0 36 V170 H84 V138 a18 18 0 0 0 0 -36 Z" fill="url(#ticket)"/>
+  <path d="M84 70 H316 V102 a18 18 0 0 0 0 36 V170 H84 V138 a18 18 0 0 0 0 -36 Z" fill="none" stroke="#ffd36b" stroke-width="3"/>
+  <line x1="150" y1="78" x2="150" y2="162" stroke="#ffd36b" stroke-width="2" stroke-dasharray="6 6"/>
+  <!-- shield + star -->
+  <path d="M117 92 L140 100 V120 C140 136 130 146 117 152 C104 146 94 136 94 120 V100 Z" fill="url(#gold)"/>
+  <path d="M117 106 l4.5 9.5 10.5 1.2 -7.8 7.1 2.2 10.3 -9.4 -5.3 -9.4 5.3 2.2 -10.3 -7.8 -7.1 10.5 -1.2z" fill="#b3122a"/>
+  <text x="170" y="112" font-family="Arial, sans-serif" font-size="26" font-weight="900" fill="#fff" letter-spacing="1">BATTLE PASS</text>
+  <text x="170" y="138" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#ffd36b" letter-spacing="2">SEASON · PREMIUM</text>
+  <g fill="#ffd36b">
+    <rect x="170" y="148" width="22" height="6" rx="3"/>
+    <rect x="198" y="148" width="22" height="6" rx="3"/>
+    <rect x="226" y="148" width="22" height="6" rx="3"/>
+    <rect x="254" y="148" width="22" height="6" rx="3" opacity="0.35"/>
+  </g>
+  <g fill="#ffe27a">
+    <path d="M326 46 l3 8 8 3 -8 3 -3 8 -3 -8 -8 -3 8 -3z"/>
+    <path d="M70 188 l2 6 6 2 -6 2 -2 6 -2 -6 -6 -2 6 -2z"/>
+  </g>
+</svg>

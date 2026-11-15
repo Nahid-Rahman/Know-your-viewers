@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 240">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="75%">
+      <stop offset="0" stop-color="#3a1a66"/>
+      <stop offset="1" stop-color="#0e0818"/>
+    </radialGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a66bff"/>
+      <stop offset="1" stop-color="#5b2bd6"/>
+    </linearGradient>
+    <linearGradient id="card2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3fd0ff"/>
+      <stop offset="1" stop-color="#2463e0"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="240" fill="url(#bg)"/>
+  <circle cx="200" cy="120" r="96" fill="#a66bff" opacity="0.16"/>
+  <!-- back card -->
+  <g transform="rotate(-12 170 120)">
+    <rect x="96" y="66" width="168" height="104" rx="12" fill="url(#card2)"/>
+    <rect x="96" y="88" width="168" height="16" fill="#1b3f9e" opacity="0.5"/>
+  </g>
+  <!-- front card -->
+  <g transform="rotate(6 220 128)">
+    <rect x="136" y="72" width="176" height="110" rx="12" fill="url(#card)"/>
+    <rect x="200" y="72" width="18" height="110" fill="#ffd36b"/>
+    <rect x="136" y="118" width="176" height="18" fill="#ffd36b"/>
+    <path d="M209 118 C188 92 168 104 184 118 Z" fill="#ffb938"/>
+    <path d="M209 118 C230 92 250 104 234 118 Z" fill="#ffb938"/>
+    <circle cx="209" cy="120" r="8" fill="#ffe08f"/>
+    <text x="150" y="168" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#fff" letter-spacing="1.5">GIFT CARD</text>
+    <text x="298" y="96" text-anchor="end" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#fff">৳500</text>
+  </g>
+  <g fill="#e6d4ff">
+    <path d="M76 52 l3 8 8 3 -8 3 -3 8 -3 -8 -8 -3 8 -3z"/>
+    <path d="M330 186 l2 6 6 2 -6 2 -2 6 -2 -6 -6 -2 6 -2z"/>
+  </g>
+</svg>

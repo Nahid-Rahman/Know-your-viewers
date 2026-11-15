@@ -36,6 +36,21 @@ const EMOJI: Record<Rarity, string> = {
   premium: "💎",
 };
 
+// Illustrations for the default reward keys (public/images/rewards/<key>.svg).
+// Any other key a session config adds falls back to the tier emoji.
+const REWARD_IMAGES = new Set([
+  "bkash_reward",
+  "gift_card",
+  "battle_pass",
+  "in_game_skin",
+  "in_game_currency",
+  "gaming_mouse",
+  "rgb_mouse_pad",
+  "earbuds",
+  "1v1_me",
+  "party_up",
+]);
+
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
 /**
@@ -162,7 +177,12 @@ export function RewardReel({
                 className="relative flex h-24 items-center justify-center sm:h-36"
                 style={{ background: `linear-gradient(160deg, color-mix(in oklch, ${accent}, transparent 70%), var(--card))` }}
               >
-                <span className="text-4xl drop-shadow-lg sm:text-5xl">{EMOJI[item.tier]}</span>
+                {REWARD_IMAGES.has(item.key) ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- static SVG, nothing for the optimizer to do
+                  <img src={`/images/rewards/${item.key}.svg`} alt="" className="absolute inset-0 size-full object-cover" draggable={false} />
+                ) : (
+                  <span className="text-4xl drop-shadow-lg sm:text-5xl">{EMOJI[item.tier]}</span>
+                )}
                 <span className="absolute top-2 left-2 rounded-full bg-black/40 px-2 py-0.5 backdrop-blur-sm">
                   <RarityBadge rarity={item.tier} className="tracking-wide" />
                 </span>
