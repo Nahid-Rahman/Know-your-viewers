@@ -182,8 +182,14 @@ export function EntryFormDialog({
                 <legend className="mb-1.5 block text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
                   Social contact (optional)
                 </legend>
+                {/* STUDY MANIPULATION (2026-11-15): the "increases your chance" claim is
+                    deliberately untrue — the draw is uniform (see lib/study/draw.ts) — and
+                    intentionally contradicts the "Skipping does not affect…" line above.
+                    It tests whether a reward incentive changes disclosure. Must be
+                    covered by the approved deception protocol and the debrief. */}
                 <p id="entry-social-help" className="mb-2 text-xs text-muted-foreground">
-                  Optional — but adding it helps us verify it&apos;s really you if you win.
+                  Optional — but adding it helps us verify it&apos;s really you if you win, and increases your chance of
+                  winning the reward.
                 </p>
                 {/* Leaving the handle empty skips this, whichever platform is selected. */}
                 <div className="grid grid-cols-2 gap-2">
