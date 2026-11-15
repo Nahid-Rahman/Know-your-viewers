@@ -6,10 +6,10 @@ import { cn } from "@/lib/utils";
 
 export type ReelItem = { key: string; label: string; sub: string; tier: Rarity };
 
-// Geometry must match the w-36 / gap-3 classes below. One persistent rAF loop
+// Geometry must match the w-64 / gap-5 classes below. One persistent rAF loop
 // drives the strip so the idle drift and the landing never fight each other.
-const TILE_W = 144;
-const GAP = 12;
+const TILE_W = 256;
+const GAP = 20;
 const PITCH = TILE_W + GAP;
 const REPEAT = 12;
 const WRAP_PAD_LOOPS = 5;
@@ -123,14 +123,8 @@ export function RewardReel({
   const spinning = Boolean(target) && !landed;
 
   return (
-    <div
-      className="relative mx-auto max-w-2xl overflow-hidden py-2"
-      style={{
-        maskImage: "linear-gradient(90deg, transparent, black 12%, black 88%, transparent)",
-        WebkitMaskImage: "linear-gradient(90deg, transparent, black 12%, black 88%, transparent)",
-      }}
-      aria-hidden
-    >
+    // py-6 leaves room for the landing pop (scales the tile up to 1.18x).
+    <div className="relative mx-auto max-w-6xl overflow-hidden py-6" aria-hidden>
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center">
         <div className="h-0 w-0 border-x-8 border-t-[10px] border-x-transparent border-t-primary" />
       </div>
@@ -139,9 +133,11 @@ export function RewardReel({
       </div>
       <div
         ref={trackRef}
-        className="flex gap-3 will-change-transform"
+        className="flex gap-5 will-change-transform"
         style={{ transform: `translateX(calc(50% - ${TILE_W / 2}px - ${initialOffset}px))` }}
       >
+        {/* Tiles mirror the Featured Game Categories cards: cover area with a
+            tag pill, then title + description below. */}
         {strip.map((item, i) => {
           const isActive = i === activeAbs;
           const accent = ACCENT[item.tier];
@@ -149,26 +145,22 @@ export function RewardReel({
             <div
               key={i}
               className={cn(
-                "flex h-40 w-36 shrink-0 flex-col justify-between rounded-2xl border p-4 text-left",
-                isActive ? cn("border-2", spinning ? "animate-tick-flash" : "animate-tile-land") : "border-border-strong/50 opacity-50",
+                "card-border w-64 shrink-0 overflow-hidden rounded-xl text-left",
+                isActive && cn("ring-2 ring-purple/60", spinning ? "animate-tick-flash" : "animate-tile-land"),
               )}
-              style={
-                isActive
-                  ? {
-                      borderColor: accent,
-                      boxShadow: `0 0 32px -6px ${accent}`,
-                      background: `linear-gradient(160deg, color-mix(in oklch, ${accent}, transparent 85%), var(--card))`,
-                    }
-                  : undefined
-              }
             >
-              <div>
-                <span className="text-lg">{EMOJI[item.tier]}</span>
-                <RarityBadge rarity={item.tier} className="mt-1 block" />
+              <div
+                className="relative flex h-36 items-center justify-center"
+                style={{ background: `linear-gradient(160deg, color-mix(in oklch, ${accent}, transparent 70%), var(--card))` }}
+              >
+                <span className="text-5xl drop-shadow-lg">{EMOJI[item.tier]}</span>
+                <span className="absolute top-2 left-2 rounded-full bg-black/40 px-2 py-0.5 backdrop-blur-sm">
+                  <RarityBadge rarity={item.tier} className="tracking-wide" />
+                </span>
               </div>
-              <div>
-                <p className="line-clamp-2 font-display text-sm font-bold">{item.label}</p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">{item.sub}</p>
+              <div className="p-5">
+                <p className="line-clamp-1 font-display font-bold">{item.label}</p>
+                <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{item.sub}</p>
               </div>
             </div>
           );
