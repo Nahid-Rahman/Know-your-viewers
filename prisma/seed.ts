@@ -93,7 +93,7 @@ async function main() {
         { label: "Shoutout Entry", sub: "Community", rarity: "common" },
         { label: "Mystery Viewer Drop", sub: "Auto-generated", rarity: "exceptional" },
       ],
-      gameTypeOptions: ["Valorant-style Tactical FPS", "PUBG Mobile Battle Royale", "COD Mobile FPS", "Other"],
+      gameTypeOptions: ["Valorant", "PUBG Battle Royale", "Call of Duty", "Other"],
       watchFrequencyOptions: ["Daily", "A few times a week", "Weekly", "Occasionally", "Rarely"],
       faqItems: [
         {
