@@ -44,5 +44,6 @@ export const FIELD_LIMITS = {
 } as const;
 
 /** Elements a FIELD_INTERACTED / section event may name — nothing else is accepted. */
-export const TRACKABLE_FIELDS = ["phone", "ageGroup", "email", "ign", "socialType", "socialHandle"] as const;
+// "socialType"/"socialHandle" are legacy (single-social form, before 2026-11-15).
+export const TRACKABLE_FIELDS = ["phone", "ageGroup", "email", "ign", "discord", "facebook", "socialType", "socialHandle"] as const;
 export type TrackableField = (typeof TRACKABLE_FIELDS)[number];

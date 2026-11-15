@@ -49,8 +49,8 @@ export const validEntry = (phone = "01712345678", extra: Record<string, unknown>
   ageGroup: "AGE_18_30",
   email: "",
   ign: "",
-  socialType: "",
-  socialHandle: "",
+  discord: "",
+  facebook: "",
   ...extra,
 });
 

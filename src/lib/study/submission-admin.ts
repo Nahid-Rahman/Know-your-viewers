@@ -84,8 +84,8 @@ export async function revealSubmissionContact(actor: Actor, submissionId: string
     phone: dec(contact.encryptedPhone),
     email: dec(contact.encryptedEmail),
     ign: dec(contact.encryptedIgn),
-    social: dec(contact.encryptedSocial),
-    socialType: submission.socialType,
+    discord: dec(contact.encryptedDiscord),
+    facebook: dec(contact.encryptedFacebook),
   };
   await audit(prisma, {
     actorId: actor.id,
@@ -96,7 +96,7 @@ export async function revealSubmissionContact(actor: Actor, submissionId: string
     detail: {
       purpose: purpose.trim().slice(0, 200),
       fields: Object.entries(result)
-        .filter(([k, v]) => k !== "socialType" && v)
+        .filter(([, v]) => v)
         .map(([k]) => k),
     },
   });
@@ -222,6 +222,8 @@ export async function purgeResearchData(actor: Actor, submissionId: string, opts
         encryptedEmail: null,
         encryptedIgn: null,
         encryptedSocial: null,
+        encryptedDiscord: null,
+        encryptedFacebook: null,
         optionalPurgedAt: new Date(),
         ...(prizeEntitled ? {} : { encryptedPhone: null, phonePurgedAt: new Date() }),
       },

@@ -129,7 +129,7 @@ export default async function SubmissionDetailPage({ params }: PageProps<"/resea
             <Row label="Age group">{AGE_GROUP_LABELS[s.ageGroup]}</Row>
             <Row label="Phone">{s.contact?.phonePurgedAt ? "removed" : maskPhone(s.contact?.phoneTail)}</Row>
             <Row label="Email / IGN / social">
-              {[s.emailProvided && "email", s.ignProvided && "IGN", s.socialProvided && (s.socialType === "DISCORD" ? "Discord" : "Facebook")]
+              {[s.emailProvided && "email", s.ignProvided && "IGN", s.discordProvided && "Discord", s.facebookProvided && "Facebook"]
                 .filter(Boolean)
                 .join(", ") || "none supplied"}
               {s.contact?.optionalPurgedAt ? " (values removed)" : ""}

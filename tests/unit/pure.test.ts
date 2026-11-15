@@ -165,9 +165,12 @@ describe("entry form schema", () => {
   });
   it("validates optional fields only when supplied", () => {
     expect(entryFormSchema.safeParse({ ...ok, email: "nope" }).success).toBe(false);
-    expect(entryFormSchema.safeParse({ ...ok, socialType: "DISCORD", socialHandle: "bad name!" }).success).toBe(false);
-    expect(entryFormSchema.safeParse({ ...ok, socialType: "DISCORD", socialHandle: "good_name" }).success).toBe(true);
-    expect(entryFormSchema.safeParse({ ...ok, socialType: "", socialHandle: "orphan" }).success).toBe(false);
+    expect(entryFormSchema.safeParse({ ...ok, discord: "bad name!" }).success).toBe(false);
+    expect(entryFormSchema.safeParse({ ...ok, discord: "good_name" }).success).toBe(true);
+    expect(entryFormSchema.safeParse({ ...ok, facebook: "https://example.com/me" }).success).toBe(false);
+    expect(entryFormSchema.safeParse({ ...ok, facebook: "facebook.com/good.name" }).success).toBe(true);
+    // Discord and Facebook are independent: both at once is fine.
+    expect(entryFormSchema.safeParse({ ...ok, discord: "good_name", facebook: "Good Name" }).success).toBe(true);
     expect(entryFormSchema.safeParse({ ...ok, ign: "x".repeat(41) }).success).toBe(false);
   });
 });

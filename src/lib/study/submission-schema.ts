@@ -36,20 +36,16 @@ export const entryFormSchema = z
       "Enter a valid email address, or leave it blank.",
     ),
     ign: optionalText(FIELD_LIMITS.ign),
-    socialType: z.enum(["", "DISCORD", "FACEBOOK"]).optional().default(""),
-    socialHandle: optionalText(FIELD_LIMITS.facebook),
+    // Both social contacts are optional and independent.
+    discord: optionalText(FIELD_LIMITS.discord),
+    facebook: optionalText(FIELD_LIMITS.facebook),
   })
   .superRefine((v, ctx) => {
-    if (!v.socialType && v.socialHandle) {
-      ctx.addIssue({ code: "custom", path: ["socialType"], message: "Choose Discord or Facebook, or clear the field." });
+    if (v.discord && !DISCORD_RE.test(v.discord)) {
+      ctx.addIssue({ code: "custom", path: ["discord"], message: "Enter a Discord username (2–32 letters, digits, _ or .)." });
     }
-    if (v.socialType === "DISCORD" && v.socialHandle) {
-      if (v.socialHandle.length > FIELD_LIMITS.discord || !DISCORD_RE.test(v.socialHandle)) {
-        ctx.addIssue({ code: "custom", path: ["socialHandle"], message: "Enter a Discord username (2–32 letters, digits, _ or .)." });
-      }
-    }
-    if (v.socialType === "FACEBOOK" && v.socialHandle && /^https?:/i.test(v.socialHandle) && !FACEBOOK_URL_RE.test(v.socialHandle)) {
-      ctx.addIssue({ code: "custom", path: ["socialHandle"], message: "Enter a facebook.com profile link or your profile name." });
+    if (v.facebook && /^https?:/i.test(v.facebook) && !FACEBOOK_URL_RE.test(v.facebook)) {
+      ctx.addIssue({ code: "custom", path: ["facebook"], message: "Enter a facebook.com profile link or your profile name." });
     }
   });
 

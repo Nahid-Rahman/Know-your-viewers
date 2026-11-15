@@ -47,7 +47,7 @@ export async function retentionRun(actor: Actor, experimentId: string, opts: { d
   const optionalWhere = optionalCutoff
     ? {
         submission: { experimentId, submittedAt: { lt: optionalCutoff } },
-        OR: [{ encryptedEmail: { not: null } }, { encryptedIgn: { not: null } }, { encryptedSocial: { not: null } }],
+        OR: [{ encryptedEmail: { not: null } }, { encryptedIgn: { not: null } }, { encryptedSocial: { not: null } }, { encryptedDiscord: { not: null } }, { encryptedFacebook: { not: null } }],
       }
     : null;
   const eventWhere = eventCutoff ? { experimentId, occurredAt: { lt: eventCutoff } } : null;
@@ -81,7 +81,7 @@ export async function retentionRun(actor: Actor, experimentId: string, opts: { d
     if (optionalWhere) {
       await tx.submissionContact.updateMany({
         where: optionalWhere,
-        data: { encryptedEmail: null, encryptedIgn: null, encryptedSocial: null, optionalPurgedAt: now },
+        data: { encryptedEmail: null, encryptedIgn: null, encryptedSocial: null, encryptedDiscord: null, encryptedFacebook: null, optionalPurgedAt: now },
       });
     }
     if (eventWhere) await tx.studyEvent.deleteMany({ where: eventWhere });

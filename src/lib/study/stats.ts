@@ -67,8 +67,8 @@ export async function submissionSummary(where: Prisma.SubmissionWhereInput) {
         prisma.submission.count({ where: { ...where, status: "CANONICAL", emailProvided: true } }),
         prisma.submission.count({ where: { ...where, status: "CANONICAL", ignProvided: true } }),
         prisma.submission.count({ where: { ...where, status: "CANONICAL", socialProvided: true } }),
-        prisma.submission.count({ where: { ...where, status: "CANONICAL", socialType: "DISCORD" } }),
-        prisma.submission.count({ where: { ...where, status: "CANONICAL", socialType: "FACEBOOK" } }),
+        prisma.submission.count({ where: { ...where, status: "CANONICAL", discordProvided: true } }),
+        prisma.submission.count({ where: { ...where, status: "CANONICAL", facebookProvided: true } }),
       ]);
       // Denominator for every rate: canonical submissions.
       return { denominator: agg._count._all, email, ign, social, discord, facebook };

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -45,9 +45,8 @@ export function EntryFormDialog({
 
   const form = useForm<EntryFormInput, unknown, EntryFormValues>({
     resolver: zodResolver(entryFormSchema),
-    defaultValues: { phone: "", ageGroup: undefined, email: "", ign: "", socialType: "", socialHandle: "" },
+    defaultValues: { phone: "", ageGroup: undefined, email: "", ign: "", discord: "", facebook: "" },
   });
-  const socialType = useWatch({ control: form.control, name: "socialType" });
   const errors = form.formState.errors;
 
   function interacted(field: TrackableField) {
@@ -191,52 +190,36 @@ export function EntryFormDialog({
                   Optional — but adding it helps us verify it&apos;s really you if you win, and increases your chance of
                   winning the reward.
                 </p>
-                {/* Leaving the handle empty skips this, whichever platform is selected. */}
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { value: "DISCORD", label: "Discord" },
-                    { value: "FACEBOOK", label: "Facebook" },
-                  ].map((o) => (
-                    <label key={o.value} className={RADIO_CARD}>
-                      <input
-                        type="radio"
-                        value={o.value}
-                        className="sr-only"
-                        onFocus={() => interacted("socialType")}
-                        {...form.register("socialType")}
-                      />
-                      {o.label}
-                    </label>
-                  ))}
-                </div>
-                {errors.socialType && <p className="mt-1 text-xs text-destructive" role="alert">{errors.socialType.message}</p>}
-                <div className="mt-2">
-                  <LightFieldLabel htmlFor="entry-social">
-                    {socialType === "DISCORD"
-                      ? "Discord username"
-                      : socialType === "FACEBOOK"
-                        ? "Facebook profile link or name"
-                        : "Username or profile link"}
-                  </LightFieldLabel>
-                  <LightInput
-                    id="entry-social"
-                    autoComplete="off"
-                    maxLength={socialType === "DISCORD" ? FIELD_LIMITS.discord : FIELD_LIMITS.facebook}
-                    placeholder={
-                      socialType === "DISCORD"
-                        ? "username"
-                        : socialType === "FACEBOOK"
-                          ? "facebook.com/your.profile"
-                          : "Pick Discord or Facebook above"
-                    }
-                    aria-invalid={Boolean(errors.socialHandle)}
-                    aria-describedby="entry-social-help"
-                    onFocus={() => interacted("socialHandle")}
-                    {...form.register("socialHandle")}
-                  />
-                  {errors.socialHandle && (
-                    <p className="mt-1 text-xs text-destructive" role="alert">{errors.socialHandle.message}</p>
-                  )}
+                {/* Two independent fields: fill either, both, or neither. */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <LightFieldLabel htmlFor="entry-discord">Discord username</LightFieldLabel>
+                    <LightInput
+                      id="entry-discord"
+                      autoComplete="off"
+                      maxLength={FIELD_LIMITS.discord}
+                      placeholder="username"
+                      aria-invalid={Boolean(errors.discord)}
+                      aria-describedby="entry-social-help"
+                      onFocus={() => interacted("discord")}
+                      {...form.register("discord")}
+                    />
+                    {errors.discord && <p className="mt-1 text-xs text-destructive" role="alert">{errors.discord.message}</p>}
+                  </div>
+                  <div>
+                    <LightFieldLabel htmlFor="entry-facebook">Facebook profile link or name</LightFieldLabel>
+                    <LightInput
+                      id="entry-facebook"
+                      autoComplete="off"
+                      maxLength={FIELD_LIMITS.facebook}
+                      placeholder="facebook.com/your.profile"
+                      aria-invalid={Boolean(errors.facebook)}
+                      aria-describedby="entry-social-help"
+                      onFocus={() => interacted("facebook")}
+                      {...form.register("facebook")}
+                    />
+                    {errors.facebook && <p className="mt-1 text-xs text-destructive" role="alert">{errors.facebook.message}</p>}
+                  </div>
                 </div>
               </fieldset>
             </div>

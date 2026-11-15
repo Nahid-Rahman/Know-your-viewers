@@ -111,7 +111,24 @@ describe("submission and duplicates", () => {
     const r = await submitEntryForVisit({ visitorId: v.visitorId, visitId: v.visit.id, idempotencyKey: key(), values: { phone: "01912345678", ageGroup: "BELOW_18" } });
     expect(r.ok).toBe(true);
     const s = await prisma.submission.findFirstOrThrow();
-    expect(s).toMatchObject({ status: "CANONICAL", emailProvided: false, ignProvided: false, socialProvided: false, socialType: null });
+    expect(s).toMatchObject({ status: "CANONICAL", emailProvided: false, ignProvided: false, socialProvided: false, discordProvided: false, facebookProvided: false, socialType: null });
+  });
+
+  it("stores Discord and Facebook contacts independently", async () => {
+    await makeActiveStudy();
+    const v = await newVisit();
+    const r = await submitEntryForVisit({
+      visitorId: v.visitorId,
+      visitId: v.visit.id,
+      idempotencyKey: key(),
+      values: { phone: "01912345678", ageGroup: "AGE_18_30", discord: "good_name", facebook: "Good Name" },
+    });
+    expect(r.ok).toBe(true);
+    const s = await prisma.submission.findFirstOrThrow({ include: { contact: true } });
+    expect(s).toMatchObject({ socialProvided: true, discordProvided: true, facebookProvided: true, socialType: null });
+    expect(s.contact?.encryptedDiscord).toBeTruthy();
+    expect(s.contact?.encryptedFacebook).toBeTruthy();
+    expect(s.contact?.encryptedDiscord).not.toBe(s.contact?.encryptedFacebook);
   });
 
   it("rejects missing phone or age group on the server", async () => {

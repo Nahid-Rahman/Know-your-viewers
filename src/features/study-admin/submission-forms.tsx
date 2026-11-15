@@ -47,8 +47,8 @@ export function RevealContact({ submissionId }: { submissionId: string }) {
           <dt className="text-muted-foreground">Phone</dt><dd className="font-mono">{values.phone ?? "(removed)"}</dd>
           <dt className="text-muted-foreground">Email</dt><dd>{values.email ?? "—"}</dd>
           <dt className="text-muted-foreground">In-game name</dt><dd>{values.ign ?? "—"}</dd>
-          <dt className="text-muted-foreground">{values.socialType === "DISCORD" ? "Discord" : values.socialType === "FACEBOOK" ? "Facebook" : "Social"}</dt>
-          <dd className="break-all">{values.social ?? "—"}</dd>
+          <dt className="text-muted-foreground">Discord</dt><dd className="break-all">{values.discord ?? "—"}</dd>
+          <dt className="text-muted-foreground">Facebook</dt><dd className="break-all">{values.facebook ?? "—"}</dd>
         </dl>
         <Button size="sm" variant="outline" className="mt-2" onClick={() => setValues(null)}>Hide</Button>
       </div>

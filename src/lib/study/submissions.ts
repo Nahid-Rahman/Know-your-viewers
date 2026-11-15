@@ -109,7 +109,9 @@ export async function submitEntryForVisit(input: {
   if (!phone.ok) return { ok: false, code: "INVALID", error: phone.error };
   const phoneHash = hashPhone(phone.e164);
   const spin = await prisma.spinOutcome.findUnique({ where: { visitId: visit.id }, select: { id: true } });
-  const socialProvided = Boolean(values.socialType && values.socialHandle);
+  const discordProvided = Boolean(values.discord);
+  const facebookProvided = Boolean(values.facebook);
+  const socialProvided = discordProvided || facebookProvided;
 
   for (let attempt = 0; attempt < 4; attempt++) {
     const responseCode = generateResponseCode();
@@ -132,8 +134,10 @@ export async function submitEntryForVisit(input: {
             ageGroup: values.ageGroup,
             emailProvided: Boolean(values.email),
             ignProvided: Boolean(values.ign),
-            socialType: socialProvided ? (values.socialType as "DISCORD" | "FACEBOOK") : null,
+            socialType: null,
             socialProvided,
+            discordProvided,
+            facebookProvided,
             status: "CANONICAL",
             submittedAt: now,
           },
@@ -164,7 +168,8 @@ export async function submitEntryForVisit(input: {
             phoneTail: phone.e164.slice(-2),
             encryptedEmail: values.email ? encryptContact(values.email) : null,
             encryptedIgn: values.ign ? encryptContact(values.ign) : null,
-            encryptedSocial: socialProvided ? encryptContact(values.socialHandle) : null,
+            encryptedDiscord: discordProvided ? encryptContact(values.discord) : null,
+            encryptedFacebook: facebookProvided ? encryptContact(values.facebook) : null,
           },
         });
 
@@ -175,6 +180,8 @@ export async function submitEntryForVisit(input: {
             emailProvided: Boolean(values.email),
             ignProvided: Boolean(values.ign),
             socialProvided,
+            discordProvided,
+            facebookProvided,
           },
         });
         if (status === "DUPLICATE") {

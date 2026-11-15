@@ -52,7 +52,8 @@ export default async function SubmissionReceivedPage({ searchParams }: PageProps
     ["Age group", AGE_GROUP_LABELS[submission.ageGroup]],
     ["Email", submission.emailProvided ? "Provided" : "Skipped"],
     ["In-game name", submission.ignProvided ? "Provided" : "Skipped"],
-    ["Social contact", submission.socialProvided ? (submission.socialType === "DISCORD" ? "Discord provided" : "Facebook provided") : "Skipped"],
+    ["Discord", submission.discordProvided ? "Provided" : "Skipped"],
+    ["Facebook", submission.facebookProvided ? "Provided" : "Skipped"],
   ];
 
   return (
