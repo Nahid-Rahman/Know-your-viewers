@@ -85,7 +85,7 @@ export function EntryFormDialog({
         if (!submitting) onOpenChange(next);
       }}
     >
-      <DialogContent className="max-w-lg sm:max-w-lg">
+      <DialogContent className="max-w-2xl sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="font-display text-xl font-bold">Enter the prize draw</DialogTitle>
           {result && (
@@ -180,50 +180,58 @@ export function EntryFormDialog({
               </div>
               <fieldset>
                 <legend className="mb-1.5 block text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-                  Social contact (optional — choose one)
+                  Social contact (optional)
                 </legend>
-                <div className="grid grid-cols-3 gap-2">
+                <p id="entry-social-help" className="mb-2 text-xs text-muted-foreground">
+                  Optional — but adding it helps us verify it&apos;s really you if you win.
+                </p>
+                {/* Leaving the handle empty skips this, whichever platform is selected. */}
+                <div className="grid grid-cols-2 gap-2">
                   {[
-                    { value: "", label: "Skip" },
                     { value: "DISCORD", label: "Discord" },
                     { value: "FACEBOOK", label: "Facebook" },
                   ].map((o) => (
-                    <label key={o.value || "none"} className={RADIO_CARD}>
+                    <label key={o.value} className={RADIO_CARD}>
                       <input
                         type="radio"
                         value={o.value}
                         className="sr-only"
                         onFocus={() => interacted("socialType")}
-                        {...form.register("socialType", {
-                          onChange: (e) => {
-                            if (!e.target.value) form.setValue("socialHandle", "");
-                          },
-                        })}
+                        {...form.register("socialType")}
                       />
                       {o.label}
                     </label>
                   ))}
                 </div>
                 {errors.socialType && <p className="mt-1 text-xs text-destructive" role="alert">{errors.socialType.message}</p>}
-                {socialType ? (
-                  <div className="mt-2">
-                    <LightFieldLabel htmlFor="entry-social">
-                      {socialType === "DISCORD" ? "Discord username" : "Facebook profile link or name"}
-                    </LightFieldLabel>
-                    <LightInput
-                      id="entry-social"
-                      autoComplete="off"
-                      maxLength={socialType === "DISCORD" ? FIELD_LIMITS.discord : FIELD_LIMITS.facebook}
-                      placeholder={socialType === "DISCORD" ? "username" : "facebook.com/your.profile"}
-                      aria-invalid={Boolean(errors.socialHandle)}
-                      onFocus={() => interacted("socialHandle")}
-                      {...form.register("socialHandle")}
-                    />
-                    {errors.socialHandle && (
-                      <p className="mt-1 text-xs text-destructive" role="alert">{errors.socialHandle.message}</p>
-                    )}
-                  </div>
-                ) : null}
+                <div className="mt-2">
+                  <LightFieldLabel htmlFor="entry-social">
+                    {socialType === "DISCORD"
+                      ? "Discord username"
+                      : socialType === "FACEBOOK"
+                        ? "Facebook profile link or name"
+                        : "Username or profile link"}
+                  </LightFieldLabel>
+                  <LightInput
+                    id="entry-social"
+                    autoComplete="off"
+                    maxLength={socialType === "DISCORD" ? FIELD_LIMITS.discord : FIELD_LIMITS.facebook}
+                    placeholder={
+                      socialType === "DISCORD"
+                        ? "username"
+                        : socialType === "FACEBOOK"
+                          ? "facebook.com/your.profile"
+                          : "Pick Discord or Facebook above"
+                    }
+                    aria-invalid={Boolean(errors.socialHandle)}
+                    aria-describedby="entry-social-help"
+                    onFocus={() => interacted("socialHandle")}
+                    {...form.register("socialHandle")}
+                  />
+                  {errors.socialHandle && (
+                    <p className="mt-1 text-xs text-destructive" role="alert">{errors.socialHandle.message}</p>
+                  )}
+                </div>
               </fieldset>
             </div>
           </div>
