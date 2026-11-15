@@ -9,6 +9,11 @@ import { cn } from "@/lib/utils";
 const AUTO_SCROLL_INTERVAL_MS = 4000;
 // Any manual interaction (click, drag, hover) pauses auto-scroll for this long.
 const RESUME_DELAY_MS = 6000;
+// How long scrolling must be idle before we treat it as settled and, if it
+// ended on a cloned copy, quietly jump back to the matching real card.
+const SETTLE_DELAY_MS = 150;
+
+type GameCategory = { icon: string; image: string; tag: string; title: string; description: string };
 
 function CategoryCoverArt({ icon, image, title }: { icon: string; image: string; title: string }) {
   return (
@@ -26,31 +31,55 @@ function CategoryCoverArt({ icon, image, title }: { icon: string; image: string;
   );
 }
 
-export function CategoriesSection({
-  gameCategories,
-}: {
-  gameCategories: { icon: string; image: string; tag: string; title: string; description: string }[];
-}) {
+/**
+ * Infinite, centre-mode carousel. The cards are rendered three times
+ * (clone set, real set, clone set); the card in the middle of the track is
+ * the highlighted one. Whenever scrolling settles on a clone, the track jumps
+ * instantly by one set width to the identical real card, so it can keep going
+ * in either direction forever without ever showing an empty edge.
+ */
+export function CategoriesSection({ gameCategories }: { gameCategories: GameCategory[] }) {
   const trackRef = useRef<HTMLDivElement>(null);
-  const [active, setActive] = useState(0);
   const count = gameCategories.length;
+  const looping = count > 1;
+  const copies = looping ? 3 : 1;
+  // First slot of the real (middle) set.
+  const realStart = looping ? count : 0;
+
+  // Index into gameCategories of the card in the middle — drives highlight + dots.
+  const [active, setActive] = useState(0);
+  // Slot (index across all rendered copies) currently in the middle.
+  const slotRef = useRef(realStart);
   // Timestamp until which auto-scroll should stay paused — a ref so ticking
   // it doesn't cause re-renders.
   const pausedUntilRef = useRef(0);
 
-  function scrollToIndex(index: number) {
+  function cardsOf(track: HTMLElement) {
+    return Array.from(track.querySelectorAll<HTMLElement>("[data-category-card]"));
+  }
+
+  function centreOffset(track: HTMLElement, card: HTMLElement) {
+    return card.offsetLeft - track.offsetLeft + card.offsetWidth / 2 - track.clientWidth / 2;
+  }
+
+  // Scroll so the card at the given slot sits in the middle of the track.
+  function scrollToSlot(slot: number, behavior: ScrollBehavior = "smooth") {
     const track = trackRef.current;
-    const card = track?.children[index] as HTMLElement | undefined;
+    const card = track ? cardsOf(track)[slot] : undefined;
     if (!track || !card) return;
-    track.scrollTo({ left: card.offsetLeft - track.offsetLeft, behavior: "smooth" });
+    slotRef.current = slot;
+    setActive(slot % count);
+    track.scrollTo({ left: centreOffset(track, card), behavior });
   }
 
   function go(delta: number) {
-    setActive((current) => {
-      const next = (current + delta + count) % count;
-      scrollToIndex(next);
-      return next;
-    });
+    scrollToSlot(slotRef.current + delta);
+  }
+
+  // Jump to category `index`, staying within the copy currently in view.
+  function goToCategory(index: number) {
+    const slot = slotRef.current;
+    scrollToSlot(slot - (slot % count) + index);
   }
 
   function pauseAutoScroll() {
@@ -60,29 +89,53 @@ export function CategoriesSection({
     pausedUntilRef.current = Date.now() + RESUME_DELAY_MS;
   }
 
-  // Keep the dots/highlight in sync with manual swipe/drag/wheel scrolling.
   useEffect(() => {
     const track = trackRef.current;
     if (!track) return;
 
+    // Open on the first real card, with clones filling the left side.
+    const first = cardsOf(track)[realStart];
+    if (first) track.scrollTo({ left: centreOffset(track, first), behavior: "instant" });
+
     let frame: number | null = null;
+    let settleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // If we came to rest on a clone, shift by exactly one set width so the
+    // identical real card is in the middle — visually a no-op.
+    function recentre() {
+      const t = trackRef.current;
+      if (!t || !looping) return;
+      const cards = cardsOf(t);
+      const slot = slotRef.current;
+      if (slot >= count && slot < 2 * count) return;
+      const setWidth = cards[count].offsetLeft - cards[0].offsetLeft;
+      const shift = slot < count ? count : -count;
+      t.scrollTo({ left: t.scrollLeft + (shift > 0 ? setWidth : -setWidth), behavior: "instant" });
+      slotRef.current = slot + shift;
+    }
+
+    // Track whichever card is in the middle, including during manual
+    // swipe/drag/wheel scrolling.
     function onScroll() {
+      if (settleTimer !== null) clearTimeout(settleTimer);
+      settleTimer = setTimeout(recentre, SETTLE_DELAY_MS);
       if (frame !== null) return;
       frame = requestAnimationFrame(() => {
         frame = null;
         const t = trackRef.current;
         if (!t) return;
+        const middle = t.scrollLeft + t.clientWidth / 2;
         let closest = 0;
         let closestDist = Infinity;
-        Array.from(t.children).forEach((child, i) => {
-          const el = child as HTMLElement;
-          const dist = Math.abs(el.offsetLeft - t.offsetLeft - t.scrollLeft);
+        cardsOf(t).forEach((el, i) => {
+          const dist = Math.abs(el.offsetLeft - t.offsetLeft + el.offsetWidth / 2 - middle);
           if (dist < closestDist) {
             closestDist = dist;
             closest = i;
           }
         });
-        setActive(closest);
+        slotRef.current = closest;
+        setActive(closest % count);
       });
     }
 
@@ -92,13 +145,15 @@ export function CategoriesSection({
       track.removeEventListener("scroll", onScroll);
       track.removeEventListener("pointerdown", pauseAutoScroll);
       if (frame !== null) cancelAnimationFrame(frame);
+      if (settleTimer !== null) clearTimeout(settleTimer);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [count]);
 
   // Auto-advance one card at a time, skipped for prefers-reduced-motion and
   // paused for a while after any manual interaction.
   useEffect(() => {
-    if (count <= 1) return;
+    if (!looping) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     const id = setInterval(() => {
@@ -108,6 +163,10 @@ export function CategoriesSection({
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [count]);
+
+  const slots = Array.from({ length: copies }, (_, copy) =>
+    gameCategories.map((cat, i) => ({ cat, i, copy })),
+  ).flat();
 
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6">
@@ -124,31 +183,36 @@ export function CategoriesSection({
       <div
         ref={trackRef}
         onMouseEnter={pauseAutoScroll}
-        className="scrollbar-none flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth pb-2"
+        className="scrollbar-none flex snap-x snap-mandatory gap-5 overflow-x-auto pb-2"
       >
-        {gameCategories.map((cat, i) => (
-          <div
-            key={cat.title}
-            className={cn(
-              "card-border w-72 shrink-0 snap-start overflow-hidden rounded-xl transition-shadow sm:w-[calc((100%-2.5rem)/2)] lg:w-[calc((100%-5rem)/3)]",
-              i === active && "ring-1 ring-purple/40",
-            )}
-          >
-            <div className="relative">
-              <CategoryCoverArt icon={cat.icon} image={cat.image} title={cat.title} />
-              <span className="absolute top-2 left-2 rounded-full bg-black/40 px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase backdrop-blur-sm">
-                {cat.tag}
-              </span>
+        {slots.map(({ cat, i, copy }) => {
+          const isClone = looping && copy !== 1;
+          return (
+            <div
+              key={`${copy}-${cat.title}`}
+              data-category-card
+              aria-hidden={isClone || undefined}
+              className={cn(
+                "card-border w-72 shrink-0 snap-center overflow-hidden rounded-xl transition-shadow sm:w-[calc((100%-2.5rem)/2)] lg:w-[calc((100%-5rem)/3)]",
+                i === active && "ring-1 ring-purple/40",
+              )}
+            >
+              <div className="relative">
+                <CategoryCoverArt icon={cat.icon} image={cat.image} title={cat.title} />
+                <span className="absolute top-2 left-2 rounded-full bg-black/40 px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase backdrop-blur-sm">
+                  {cat.tag}
+                </span>
+              </div>
+              <div className="p-5">
+                <p className="font-display font-bold">{cat.title}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{cat.description}</p>
+              </div>
             </div>
-            <div className="p-5">
-              <p className="font-display font-bold">{cat.title}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{cat.description}</p>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {count > 1 && (
+      {looping && (
         <div className="mt-6 flex items-center justify-center gap-4">
           <button
             type="button"
@@ -169,8 +233,7 @@ export function CategoriesSection({
                 aria-label={`Show ${cat.title}`}
                 onClick={() => {
                   pauseAutoScroll();
-                  setActive(i);
-                  scrollToIndex(i);
+                  goToCategory(i);
                 }}
                 className={cn(
                   "h-1.5 rounded-full transition-all",
