@@ -81,6 +81,7 @@ export default async function SubmissionReceivedPage({ searchParams }: PageProps
           className="mt-4"
           label="Response code"
           value={submission.responseCode}
+          copyable
           hint="Keep this code. The research team may ask for it if they contact you. It does not give access to your details."
         />
 
