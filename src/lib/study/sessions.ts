@@ -25,7 +25,7 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
     "Spin the wheel and leave your information for a chance to win a prize from the prize pool. Winners are picked at random after the session.",
   howItWorks: [
     "Spin the reward wheel.",
-    "Enter your phone number and age group. Other fields are optional.",
+    "Fill up the form.",
     "After the session, winners are drawn at random from the prize pool and contacted by phone.",
   ],
   faqItems: [
