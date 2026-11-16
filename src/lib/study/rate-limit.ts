@@ -30,4 +30,5 @@ export const PUBLIC_LIMITS = {
   submitPerVisitor: { limit: 10, windowMs: 60 * 60 * 1000 },
   submitPerIp: { limit: 60, windowMs: 60 * 60 * 1000 },
   supportPerIp: { limit: 10, windowMs: 60 * 60 * 1000 },
+  supportLookupPerIp: { limit: 30, windowMs: 60 * 60 * 1000 },
 } as const;
