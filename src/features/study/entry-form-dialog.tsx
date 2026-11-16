@@ -166,10 +166,11 @@ export function EntryFormDialog({
                 {errors.email && <p className="mt-1 text-xs text-destructive" role="alert">{errors.email.message}</p>}
               </div>
               <div>
-                <LightFieldLabel htmlFor="entry-ign">In-game name (optional)</LightFieldLabel>
+                <LightFieldLabel htmlFor="entry-ign">In-game name with tag (optional)</LightFieldLabel>
                 <LightInput
                   id="entry-ign"
                   autoComplete="off"
+                  placeholder="Name#TAG"
                   maxLength={FIELD_LIMITS.ign}
                   aria-invalid={Boolean(errors.ign)}
                   onFocus={() => interacted("ign")}
