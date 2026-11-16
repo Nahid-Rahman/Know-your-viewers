@@ -124,7 +124,7 @@ export function StudyHome(props: StudyHomeProps) {
             {spinError ??
               (landed && target
                 ? "Enter the draw with your details — winners are picked at random after the session."
-                : "The wheel result is shown for fun — draw winners are chosen at random after the session.")}
+                : "🍀 Feeling lucky? Hit spin and see what drops for you!")}
           </p>
         </div>
       </section>
