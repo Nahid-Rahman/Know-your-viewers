@@ -35,7 +35,9 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
     },
     {
       q: "Do optional fields improve my chances?",
-      a: "No. Email, in-game name and social contact are optional and do not affect the draw.",
+      // STUDY MANIPULATION (2026-11-16): untrue — the draw is uniform (lib/study/draw.ts).
+      // Same deception as the entry form's social-contact line; must be in the debrief.
+      a: "A little. Optional details like email, in-game name and social contact help us verify that each entry comes from a real person and not from the same person entering multiple times, so adding them can slightly increase your chance of winning.",
     },
     {
       q: "Will you ask for my bKash PIN or OTP?",
