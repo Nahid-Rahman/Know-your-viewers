@@ -18,6 +18,12 @@ const SPIN_MS = 2500;
 const REDUCED_MOTION_SPIN_MS = 400;
 // ≈ the old 0.022 px/ms drift at the original 156 px tile pitch.
 const IDLE_SPEED_TILES_PER_MS = 0.022 / 156;
+// While the server is choosing the result (`pending`), the strip spins up to
+// this speed right away so the click feels instant instead of waiting on the
+// network round trip.
+const PENDING_SPEED_TILES_PER_MS = 0.03;
+// Time constant for easing the speed between idle and pending.
+const SPEED_EASE_MS = 180;
 
 const translate = (tiles: number) =>
   `translateX(calc(50% - var(--tile) / 2 - ${tiles} * (var(--tile) + var(--gap))))`;
@@ -61,11 +67,14 @@ const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 export function RewardReel({
   items,
   target,
+  pending = false,
   landed,
   onLanded,
 }: {
   items: ReelItem[];
   target: string | null;
+  /** The spin was clicked and the server result hasn't arrived yet. */
+  pending?: boolean;
   landed: boolean;
   onLanded?: () => void;
 }) {
@@ -79,6 +88,8 @@ export function RewardReel({
   const spinRef = useRef<{ start: number; from: number; to: number; duration: number } | null>(null);
   const landedFor = useRef<string | null>(null);
   const onLandedRef = useRef(onLanded);
+  const pendingRef = useRef(pending);
+  const velocityRef = useRef(IDLE_SPEED_TILES_PER_MS);
   const [activeAbs, setActiveAbs] = useState(WRAP_PAD_LOOPS * poolSize);
   const activeAbsRef = useRef(WRAP_PAD_LOOPS * poolSize);
 
@@ -86,15 +97,29 @@ export function RewardReel({
     onLandedRef.current = onLanded;
   }, [onLanded]);
 
+  useEffect(() => {
+    pendingRef.current = pending;
+  }, [pending]);
+
   // Start a landing whenever the server-chosen target arrives.
   useEffect(() => {
     if (!target || landedFor.current === target || !poolSize) return;
     const idx = Math.max(0, items.findIndex((i) => i.key === target));
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const from = offsetRef.current;
+    const v = velocityRef.current;
     let to = Math.floor(from / loopWidth) * loopWidth + idx;
-    while (to < from + (reduced ? 1 : SPIN_LOOPS) * loopWidth) to += loopWidth;
-    spinRef.current = { start: performance.now(), from, to, duration: reduced ? REDUCED_MOTION_SPIN_MS : SPIN_MS };
+    let duration = reduced ? REDUCED_MOTION_SPIN_MS : SPIN_MS;
+    if (!reduced && v > IDLE_SPEED_TILES_PER_MS * 4) {
+      // Already spinning fast: pick a stop far enough ahead and a duration
+      // whose ease-out starts at the current speed, so there's no jolt.
+      // easeOutCubic starts at 3x the average speed, hence the factor of 3.
+      while (to < from + (v * SPIN_MS) / 3) to += loopWidth;
+      duration = (3 * (to - from)) / v;
+    } else {
+      while (to < from + (reduced ? 1 : SPIN_LOOPS) * loopWidth) to += loopWidth;
+    }
+    spinRef.current = { start: performance.now(), from, to, duration };
     landedFor.current = target;
   }, [target, items, poolSize, loopWidth]);
 
@@ -127,9 +152,13 @@ export function RewardReel({
           onLandedRef.current?.();
         }
       } else if (!reduced && !landedFor.current) {
-        // Idle drift until a result exists; after landing the strip holds still.
-        offsetRef.current += IDLE_SPEED_TILES_PER_MS * (now - last);
-        if (offsetRef.current >= (WRAP_PAD_LOOPS + 1) * loopWidth) offsetRef.current -= loopWidth;
+        // Idle drift until a result exists (fast while the server is
+        // choosing); after landing the strip holds still.
+        const dt = now - last;
+        const goal = pendingRef.current ? PENDING_SPEED_TILES_PER_MS : IDLE_SPEED_TILES_PER_MS;
+        velocityRef.current += (goal - velocityRef.current) * Math.min(1, dt / SPEED_EASE_MS);
+        offsetRef.current += velocityRef.current * dt;
+        while (offsetRef.current >= (WRAP_PAD_LOOPS + 1) * loopWidth) offsetRef.current -= loopWidth;
         apply(offsetRef.current);
       }
       last = now;
@@ -140,7 +169,7 @@ export function RewardReel({
   }, [poolSize, loopWidth]);
 
   const strip = Array.from({ length: REPEAT * poolSize }, (_, i) => items[i % poolSize]);
-  const spinning = Boolean(target) && !landed;
+  const spinning = (pending || Boolean(target)) && !landed;
 
   return (
     // py-6 leaves room for the landing pop (scales the tile up to 1.18x).

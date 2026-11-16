@@ -103,7 +103,7 @@ export function StudyHome(props: StudyHomeProps) {
           </h2>
           <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">Click the spin button, then leave your details to enter the prize draw.</p>
           <div className="mt-10">
-            <RewardReel items={props.reel.items} target={target?.key ?? null} landed={landed} onLanded={handleLanded} />
+            <RewardReel items={props.reel.items} target={target?.key ?? null} pending={spinning && !target} landed={landed} onLanded={handleLanded} />
           </div>
           {landed && target && <ResultReveal label={target.label} headline={props.reel.resultHeadline} />}
           <Button
