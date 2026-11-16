@@ -112,7 +112,7 @@ export function EntryFormDialog({
               {...form.register("phone")}
             />
             <p id="entry-phone-help" className="mt-1 text-xs text-muted-foreground">
-              Used only to contact draw winners and for follow-up. Bangladesh numbers can start with 01 or +880.
+              Used only to contact draw winners and for follow-up. Bangladesh mobile numbers only — start with 01 or +880.
             </p>
             {errors.phone && (
               <p id="entry-phone-error" className="mt-1 text-xs text-destructive" role="alert">

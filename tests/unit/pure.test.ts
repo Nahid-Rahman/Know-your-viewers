@@ -21,8 +21,9 @@ describe("phone normalization", () => {
     expect(normalizePhone("abc").ok).toBe(false);
     expect(normalizePhone("+88012345").ok).toBe(false);
   });
-  it("keeps other international numbers as +digits", () => {
-    expect(normalizePhone("+44 7700 900123")).toEqual({ ok: true, e164: "+447700900123" });
+  it("rejects numbers from other countries", () => {
+    expect(normalizePhone("+44 7700 900123").ok).toBe(false);
+    expect(normalizePhone("+1 202 555 0143").ok).toBe(false);
   });
 });
 
