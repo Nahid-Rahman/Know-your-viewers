@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, FlaskConical, Users, UserSearch, PhoneCall, DatabaseZap, Settings, ClipboardList, ScrollText } from "lucide-react";
+import { LayoutDashboard, FlaskConical, Users, UserSearch, PhoneCall, DatabaseZap, Settings, ClipboardList, ScrollText, LifeBuoy } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import type { NavItem } from "@/components/layout/sidebar-nav";
 
@@ -8,6 +8,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/researcher/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/researcher/experiments", label: "Campaigns", icon: FlaskConical },
   { href: "/researcher/submissions", label: "Submissions", icon: ClipboardList },
+  { href: "/researcher/support", label: "Support Requests", icon: LifeBuoy },
   { href: "/researcher/streamers", label: "Streamers", icon: Users },
   { href: "/researcher/research-dataset", label: "Research Dataset", icon: DatabaseZap },
   { href: "/researcher/participants", label: "Legacy Participants", icon: UserSearch },

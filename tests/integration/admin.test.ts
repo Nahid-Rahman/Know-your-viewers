@@ -14,6 +14,8 @@ import {
 import { buildStudyExport, researchEligibleSubmissions } from "@/lib/study/exports";
 import { recordActivity } from "@/lib/study/visits";
 import { retentionRun } from "@/lib/study/retention";
+import { listSupportRequests, openSupportRequest } from "@/lib/study/support-admin";
+import { encryptContact } from "@/lib/crypto";
 import { key, makeActiveStudy, makeResearcher, newVisit, resetDb, validEntry } from "../support/fixtures";
 
 beforeEach(resetDb);
@@ -208,6 +210,40 @@ describe("access control", () => {
     const log = await prisma.auditLog.findFirstOrThrow({ where: { action: "CONTACT_REVEALED" } });
     expect(JSON.stringify(log.detail)).not.toContain("1700000023");
     expect(JSON.stringify(log.detail)).not.toContain("a@b.co");
+  });
+});
+
+describe("support requests", () => {
+  it("are scoped to the linked entry's campaign, opened only with contact access, and audited without values", async () => {
+    const s = await makeActiveStudy();
+    const sub = await submit("01700000030");
+    const linked = await prisma.supportRequest.create({
+      data: {
+        issueType: "Reward verification",
+        responseCode: sub.responseCode,
+        encryptedContact: encryptContact(JSON.stringify({ email: "me@x.co" })),
+        encryptedMessage: encryptContact("Where is my prize?"),
+      },
+    });
+    await prisma.supportRequest.create({
+      data: { issueType: "Something else", encryptedContact: encryptContact("01800000000"), encryptedMessage: encryptContact("Old style") },
+    });
+
+    expect((await listSupportRequests(s.owner)).map((r) => r.id)).toHaveLength(2);
+    const opened = await openSupportRequest(s.owner, linked.id);
+    expect(opened).toEqual({ contact: [{ label: "Email", value: "me@x.co" }], message: "Where is my prize?" });
+    const log = await prisma.auditLog.findFirstOrThrow({ where: { action: "SUPPORT_REQUEST_VIEWED" } });
+    expect(JSON.stringify(log)).not.toContain("me@x.co");
+
+    const outsider = await makeResearcher();
+    expect(await listSupportRequests(outsider)).toHaveLength(0);
+    await expect(openSupportRequest(outsider, linked.id)).rejects.toThrow(/not permitted/);
+
+    const viewer = await makeResearcher();
+    await prisma.experimentCollaborator.create({ data: { experimentId: s.experiment.id, userId: viewer.id, role: "VIEWER" } });
+    const seen = await listSupportRequests(viewer);
+    expect(seen.map((r) => [r.id, r.canOpen])).toEqual([[linked.id, false]]);
+    await expect(openSupportRequest(viewer, linked.id)).rejects.toThrow(/not permitted/);
   });
 });
 

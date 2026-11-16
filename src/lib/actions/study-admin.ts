@@ -32,6 +32,7 @@ import { retentionRun } from "@/lib/study/retention";
 import { POLICY_KEYS, type PolicyKey } from "@/lib/study/policy";
 import { parseStudyLocal } from "@/lib/study/time";
 import { storeImage } from "@/lib/study/media";
+import { openSupportRequest } from "@/lib/study/support-admin";
 
 type Result<T = undefined> = { ok: true; data: T } | { error: string };
 
@@ -445,4 +446,8 @@ export async function saveInterviewAction(submissionId: string, interviewId: str
 
 export async function retentionAction(experimentId: string, dryRun: boolean) {
   return run((a) => retentionRun(a, experimentId, { dryRun }), [ADMIN]);
+}
+
+export async function openSupportRequestAction(id: string) {
+  return run((a) => openSupportRequest(a, id));
 }
