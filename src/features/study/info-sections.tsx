@@ -43,7 +43,7 @@ export function Faq({ items }: { items: { q: string; a: string }[] }) {
           Questions, <span className="text-purple">answered.</span>
         </h2>
       </div>
-      <Accordion defaultValue={["item-0"]} className="card-border rounded-xl px-2">
+      <Accordion className="card-border rounded-xl px-2">
         {items.map((item, i) => (
           <AccordionItem key={`${item.q}-${i}`} value={`item-${i}`} className="px-3">
             <AccordionTrigger className="text-sm font-semibold">{item.q}</AccordionTrigger>
