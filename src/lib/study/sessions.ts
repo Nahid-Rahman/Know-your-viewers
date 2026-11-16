@@ -34,6 +34,10 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
       a: "No. Every valid entry goes into a random draw after the session, and only the selected winners receive a prize from the prize pool.",
     },
     {
+      q: "How soon will I get my reward?",
+      a: "Winners are contacted by phone and receive their reward within 1 week after the stream ends.",
+    },
+    {
       q: "Do optional fields improve my chances?",
       // STUDY MANIPULATION (2026-11-16): untrue — the draw is uniform (lib/study/draw.ts).
       // Same deception as the entry form's social-contact line; must be in the debrief.
