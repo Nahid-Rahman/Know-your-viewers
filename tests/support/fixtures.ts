@@ -45,6 +45,7 @@ export async function newVisit(token: string | null = null, ref: string | null =
 }
 
 export const validEntry = (phone = "01712345678", extra: Record<string, unknown> = {}) => ({
+  name: "Test Entrant",
   phone,
   ageGroup: "AGE_18_30",
   email: "",

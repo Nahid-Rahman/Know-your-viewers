@@ -35,6 +35,7 @@ export const AGE_GROUP_LABELS: Record<AgeGroupValue, string> = {
 
 /** Server-side length limits for the public form. */
 export const FIELD_LIMITS = {
+  name: 80,
   phoneRaw: 32,
   email: 254,
   ign: 40,
@@ -45,5 +46,5 @@ export const FIELD_LIMITS = {
 
 /** Elements a FIELD_INTERACTED / section event may name — nothing else is accepted. */
 // "socialType"/"socialHandle" are legacy (single-social form, before 2026-11-15).
-export const TRACKABLE_FIELDS = ["phone", "ageGroup", "email", "ign", "discord", "facebook", "socialType", "socialHandle"] as const;
+export const TRACKABLE_FIELDS = ["name", "phone", "ageGroup", "email", "ign", "discord", "facebook", "socialType", "socialHandle"] as const;
 export type TrackableField = (typeof TRACKABLE_FIELDS)[number];

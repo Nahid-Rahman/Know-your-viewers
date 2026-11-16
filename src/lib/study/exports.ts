@@ -161,11 +161,12 @@ export async function buildStudyExport(actor: Actor, type: StudyExportType, expe
       include: { contact: true, followUp: true, permissions: true },
       orderBy: { submittedAt: "asc" },
     });
-    headers = ["response_code", "submitted_at", "phone", "age_group", "follow_up_status", "interview_proceed", "website_data_use", "interview_answers_use"];
+    headers = ["response_code", "submitted_at", "name", "phone", "age_group", "follow_up_status", "interview_proceed", "website_data_use", "interview_answers_use"];
     rows = subs.map((s) => {
       const p = currentPermissions(s.permissions);
       return [
-        s.responseCode, s.submittedAt, s.contact?.encryptedPhone ? decryptContact(s.contact.encryptedPhone) : "(removed)",
+        s.responseCode, s.submittedAt, s.contact?.encryptedName ? decryptContact(s.contact.encryptedName) : "",
+        s.contact?.encryptedPhone ? decryptContact(s.contact.encryptedPhone) : "(removed)",
         AGE_GROUP_LABELS[s.ageGroup], s.followUp?.status ?? "NOT_CONTACTED", p.INTERVIEW_PROCEED, p.WEBSITE_DATA_USE, p.INTERVIEW_ANSWERS_USE,
       ];
     });
@@ -175,9 +176,10 @@ export async function buildStudyExport(actor: Actor, type: StudyExportType, expe
       include: { submission: { include: { contact: true } }, draw: { select: { executedAt: true, isTest: true } } },
       orderBy: [{ drawId: "asc" }, { rank: "asc" }],
     });
-    headers = ["draw_executed_at", "is_test_draw", "rank", "response_code", "phone", "amount_bdt", "payout_status", "payment_ref", "paid_at"];
+    headers = ["draw_executed_at", "is_test_draw", "rank", "response_code", "name", "phone", "amount_bdt", "payout_status", "payment_ref", "paid_at"];
     rows = winners.map((w) => [
       w.draw.executedAt, w.draw.isTest, w.rank, w.submission.responseCode,
+      w.submission.contact?.encryptedName ? decryptContact(w.submission.contact.encryptedName) : "",
       w.submission.contact?.encryptedPhone ? decryptContact(w.submission.contact.encryptedPhone) : "(removed)",
       w.amountBdt, w.payoutStatus, w.paymentRef ?? "", w.paidAt ?? "",
     ]);

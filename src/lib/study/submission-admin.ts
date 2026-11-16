@@ -81,6 +81,7 @@ export async function revealSubmissionContact(actor: Actor, submissionId: string
   if (!contact) throw new StudyRuleError("No contact details on file.");
   const dec = (v: string | null) => (v ? decryptContact(v) : null);
   const result = {
+    name: dec(contact.encryptedName),
     phone: dec(contact.encryptedPhone),
     email: dec(contact.encryptedEmail),
     ign: dec(contact.encryptedIgn),
@@ -225,7 +226,7 @@ export async function purgeResearchData(actor: Actor, submissionId: string, opts
         encryptedDiscord: null,
         encryptedFacebook: null,
         optionalPurgedAt: new Date(),
-        ...(prizeEntitled ? {} : { encryptedPhone: null, phonePurgedAt: new Date() }),
+        ...(prizeEntitled ? {} : { encryptedName: null, encryptedPhone: null, phonePurgedAt: new Date() }),
       },
     });
     await tx.submission.update({ where: { id: submissionId }, data: { researchDataPurgedAt: new Date() } });

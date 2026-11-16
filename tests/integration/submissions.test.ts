@@ -28,6 +28,8 @@ describe("submission and duplicates", () => {
     const contact = await prisma.submissionContact.findUniqueOrThrow({ where: { submissionId: r.submissionId } });
     expect(contact.encryptedPhone).not.toContain("1712345678");
     expect(contact.phoneTail).toBe("78");
+    expect(contact.encryptedName).toBeTruthy();
+    expect(contact.encryptedName).not.toContain("Test Entrant");
     const events = await prisma.studyEvent.findMany({ where: { submissionId: r.submissionId } });
     expect(JSON.stringify(events)).not.toContain("1712345678");
   });
@@ -108,7 +110,7 @@ describe("submission and duplicates", () => {
   it("optional fields can be skipped and do not change classification", async () => {
     await makeActiveStudy();
     const v = await newVisit();
-    const r = await submitEntryForVisit({ visitorId: v.visitorId, visitId: v.visit.id, idempotencyKey: key(), values: { phone: "01912345678", ageGroup: "BELOW_18" } });
+    const r = await submitEntryForVisit({ visitorId: v.visitorId, visitId: v.visit.id, idempotencyKey: key(), values: { name: "Test Entrant", phone: "01912345678", ageGroup: "BELOW_18" } });
     expect(r.ok).toBe(true);
     const s = await prisma.submission.findFirstOrThrow();
     expect(s).toMatchObject({ status: "CANONICAL", emailProvided: false, ignProvided: false, socialProvided: false, discordProvided: false, facebookProvided: false, socialType: null });
@@ -121,7 +123,7 @@ describe("submission and duplicates", () => {
       visitorId: v.visitorId,
       visitId: v.visit.id,
       idempotencyKey: key(),
-      values: { phone: "01912345678", ageGroup: "AGE_18_30", discord: "good_name", facebook: "Good Name" },
+      values: { name: "Test Entrant", phone: "01912345678", ageGroup: "AGE_18_30", discord: "good_name", facebook: "Good Name" },
     });
     expect(r.ok).toBe(true);
     const s = await prisma.submission.findFirstOrThrow({ include: { contact: true } });

@@ -44,6 +44,7 @@ export function RevealContact({ submissionId }: { submissionId: string }) {
     return (
       <div className="rounded-lg border border-amber-400/40 bg-amber-400/5 p-3 text-sm">
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+          <dt className="text-muted-foreground">Name</dt><dd>{values.name ?? "—"}</dd>
           <dt className="text-muted-foreground">Phone</dt><dd className="font-mono">{values.phone ?? "(removed)"}</dd>
           <dt className="text-muted-foreground">Email</dt><dd>{values.email ?? "—"}</dd>
           <dt className="text-muted-foreground">In-game name</dt><dd>{values.ign ?? "—"}</dd>

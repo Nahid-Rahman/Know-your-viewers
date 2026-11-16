@@ -1,10 +1,11 @@
 // Public entry form validation, shared by the client form and the server
 // action (the server re-validates everything). Field order on the form:
-//   1. Phone number (required)
-//   2. Age group (required: Below 18 / 18–30 / 31+)
-//   3. Email (optional)
-//   4. In-game name (optional)
-//   5. Social contact (optional): choose Discord username OR Facebook profile, or skip
+//   1. Name (required)
+//   2. Phone number (required)
+//   3. Age group (required: Below 18 / 18–30 / 31+)
+//   4. Email (optional)
+//   5. In-game name with tag (optional)
+//   6. Social contact (optional): Discord username and/or Facebook profile
 
 import { z } from "zod";
 import { FIELD_LIMITS } from "./constants";
@@ -23,6 +24,7 @@ const FACEBOOK_URL_RE = /^https?:\/\/(www\.|m\.|web\.|mbasic\.)?(facebook|fb)\.c
 
 export const entryFormSchema = z
   .object({
+    name: optionalText(FIELD_LIMITS.name).refine((v) => v.length >= 2, "Enter your name."),
     phone: z
       .string()
       .max(FIELD_LIMITS.phoneRaw, "That phone number is too long.")

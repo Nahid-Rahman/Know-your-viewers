@@ -45,7 +45,7 @@ export function EntryFormDialog({
 
   const form = useForm<EntryFormInput, unknown, EntryFormValues>({
     resolver: zodResolver(entryFormSchema),
-    defaultValues: { phone: "", ageGroup: undefined, email: "", ign: "", discord: "", facebook: "" },
+    defaultValues: { name: "", phone: "", ageGroup: undefined, email: "", ign: "", discord: "", facebook: "" },
   });
   const errors = form.formState.errors;
 
@@ -97,6 +97,24 @@ export function EntryFormDialog({
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
+          <div>
+            <LightFieldLabel htmlFor="entry-name">Your name (required)</LightFieldLabel>
+            <LightInput
+              id="entry-name"
+              autoComplete="name"
+              maxLength={FIELD_LIMITS.name}
+              aria-invalid={Boolean(errors.name)}
+              aria-describedby="entry-name-error"
+              onFocus={() => interacted("name")}
+              {...form.register("name")}
+            />
+            {errors.name && (
+              <p id="entry-name-error" className="mt-1 text-xs text-destructive" role="alert">
+                {errors.name.message}
+              </p>
+            )}
+          </div>
+
           <div>
             <LightFieldLabel htmlFor="entry-phone">Phone number (required)</LightFieldLabel>
             <LightInput

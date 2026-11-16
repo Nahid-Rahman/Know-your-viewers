@@ -164,6 +164,7 @@ export async function submitEntryForVisit(input: {
         await tx.submissionContact.create({
           data: {
             submissionId: submission.id,
+            encryptedName: encryptContact(values.name),
             encryptedPhone: encryptContact(phone.e164),
             phoneTail: phone.e164.slice(-2),
             encryptedEmail: values.email ? encryptContact(values.email) : null,

@@ -1167,6 +1167,9 @@ model CampaignPhoneEntry {
 model SubmissionContact {
   id                String    @id @default(uuid())
   submissionId      String    @unique
+  // Full name, required on the form since 2026-11-16 (null on older entries).
+  // Contact data: removed together with the phone.
+  encryptedName     String?
   encryptedPhone    String?
   phoneTail         String?
   encryptedEmail    String?

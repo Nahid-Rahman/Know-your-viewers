@@ -154,9 +154,11 @@ describe("draw selection", () => {
 });
 
 describe("entry form schema", () => {
-  const ok = { phone: "01712345678", ageGroup: "AGE_31_PLUS" };
-  it("requires phone and age group only", () => {
+  const ok = { name: "Test Entrant", phone: "01712345678", ageGroup: "AGE_31_PLUS" };
+  it("requires name, phone and age group only", () => {
     expect(entryFormSchema.safeParse(ok).success).toBe(true);
+    expect(entryFormSchema.safeParse({ ...ok, name: "" }).success).toBe(false);
+    expect(entryFormSchema.safeParse({ ...ok, name: "   " }).success).toBe(false);
     expect(entryFormSchema.safeParse({ ...ok, phone: "" }).success).toBe(false);
     expect(entryFormSchema.safeParse({ phone: "01712345678" }).success).toBe(false);
   });

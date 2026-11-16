@@ -75,7 +75,7 @@ export async function retentionRun(actor: Actor, experimentId: string, opts: { d
     if (phoneIds.length) {
       await tx.submissionContact.updateMany({
         where: { submissionId: { in: phoneIds } },
-        data: { encryptedPhone: null, phonePurgedAt: now },
+        data: { encryptedName: null, encryptedPhone: null, phonePurgedAt: now },
       });
     }
     if (optionalWhere) {
