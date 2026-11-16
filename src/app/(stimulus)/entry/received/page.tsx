@@ -101,7 +101,6 @@ export default async function SubmissionReceivedPage({ searchParams }: PageProps
 
         <p className="mt-4 text-xs text-muted-foreground">
           Each phone number counts once in the draw for this campaign. Additional entries are kept for review but do not add chances.
-          We will never ask for your bKash PIN, OTP or password.
         </p>
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
