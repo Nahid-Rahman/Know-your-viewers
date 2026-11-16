@@ -22,7 +22,7 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
   // "**…**" renders in the brand gradient (RichHeadline); "\n" breaks lines.
   heroHeadline: "SPIN FOR\nYOUR\n**VIEWER DROP**\nTODAY!",
   heroSubtext:
-    "Spin the wheel and leave your phone number for a chance to win a prize from the prize pool. Winners are picked at random after the session.",
+    "Spin the wheel and leave your information for a chance to win a prize from the prize pool. Winners are picked at random after the session.",
   howItWorks: [
     "Spin the reward wheel.",
     "Enter your phone number and age group. Other fields are optional.",
@@ -106,7 +106,7 @@ export async function defaultConfigInputFor(sessionId: string): Promise<SessionC
   return {
     streamerDisplayName: session.streamer.displayName,
     streamerImageUrl: session.streamer.imageUrl ?? "",
-    welcomeText: `Thanks for watching ${session.streamer.displayName}! This page is part of a university research study run in collaboration with the stream.`,
+    welcomeText: `Thanks for watching ${session.streamer.displayName}! This page is part of a research study run in collaboration with the streamer.`,
     channelUrl: session.streamer.channelUrl.startsWith("https://") ? session.streamer.channelUrl : "",
     platform: session.platform ?? session.streamer.platform,
     homepageContent: DEFAULT_HOMEPAGE_CONTENT,
