@@ -29,9 +29,9 @@ const FIELDS: { key: SupportContactField; label: string; placeholder?: string; t
   { key: "name", label: "Your name", max: FIELD_LIMITS.name },
   { key: "phone", label: "Phone number", placeholder: "01XXXXXXXXX", type: "tel", max: FIELD_LIMITS.phoneRaw },
   { key: "email", label: "Email", type: "email", max: FIELD_LIMITS.email },
-  { key: "ign", label: "In-game name with tag", placeholder: "Name#TAG", max: FIELD_LIMITS.ign },
+  { key: "ign", label: "In-game name + tag", placeholder: "Name#TAG", max: FIELD_LIMITS.ign },
   { key: "discord", label: "Discord username", placeholder: "username", max: FIELD_LIMITS.discord },
-  { key: "facebook", label: "Facebook profile link or name", placeholder: "facebook.com/your.profile", max: FIELD_LIMITS.facebook },
+  { key: "facebook", label: "Facebook profile", placeholder: "facebook.com/your.profile", max: FIELD_LIMITS.facebook },
 ];
 const REQUIRED: SupportContactField[] = ["name", "phone"];
 
@@ -157,6 +157,7 @@ export function SupportForm() {
         </p>
       </div>
 
+      <p className="-mb-1 text-xs text-muted-foreground">Fields marked * are required; the rest are optional.</p>
       <div className="grid gap-4 sm:grid-cols-2">
         {FIELDS.map((f) => {
           const state = entry?.fields[f.key];
@@ -164,7 +165,10 @@ export function SupportForm() {
           if (state?.onFile) {
             return (
               <div key={f.key}>
-                <LightFieldLabel htmlFor={id}>{f.label}</LightFieldLabel>
+                <LightFieldLabel htmlFor={id} className="flex items-center justify-between gap-2">
+                  <span className="truncate">{f.label}</span>
+                  <span className="shrink-0 text-[10px] tracking-normal text-accent-green normal-case">✓ On file</span>
+                </LightFieldLabel>
                 <LightInput
                   id={id}
                   value={state.value ?? state.masked ?? "On file"}
@@ -172,15 +176,15 @@ export function SupportForm() {
                   aria-readonly
                   className="cursor-default opacity-80"
                 />
-                <p className="mt-1 text-xs text-accent-green">Already on file</p>
               </div>
             );
           }
           const required = REQUIRED.includes(f.key);
           return (
             <div key={f.key}>
-              <LightFieldLabel htmlFor={id}>
-                {f.label} {required ? "*" : "(optional)"}
+              <LightFieldLabel htmlFor={id} className="truncate">
+                {f.label}
+                {required ? " *" : ""}
               </LightFieldLabel>
               <LightInput
                 id={id}
