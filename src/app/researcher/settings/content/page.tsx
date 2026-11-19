@@ -12,6 +12,7 @@ import { TermsContentForm } from "@/features/researcher/terms-content-form";
 import { DebriefContentForm } from "@/features/researcher/debrief-content-form";
 import { EntryReceivedContentForm } from "@/features/researcher/entry-received-content-form";
 import { NavBrandContentForm } from "@/features/researcher/nav-brand-content-form";
+import { NotUsedNote } from "@/features/researcher/content-form-shared";
 
 export const metadata = { title: "Stimulus Content | LiveDrop Arena" };
 
@@ -35,14 +36,15 @@ export default async function SiteContentSettingsPage() {
 
       <p className="mb-4 rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-sm">
         The homepage, reward wheel and entry confirmation are now configured <strong>per stream session</strong> (Campaigns → Sessions →
-        a session → Homepage &amp; wheel configuration). The Landing, Debrief and Entry Confirmation tabs below only affect legacy
-        (pre-revision) pages. Review the Brand &amp; Navigation labels (e.g. &quot;Spin &amp; Win&quot;, &quot;Try Your Luck&quot;) and the
+        a session → Homepage &amp; wheel configuration). In the Landing tab only the
+        trust badges and game categories are still live; the Debrief and Entry Confirmation tabs are not used by the live site. Each
+        block is marked. Review the Brand &amp; Navigation labels (e.g. &quot;Spin &amp; Win&quot;, &quot;Try Your Luck&quot;) and the
         footer disclaimer against the approved study wording.
       </p>
 
       <Tabs defaultValue="landing">
         <TabsList className="mb-6 flex-wrap">
-          <TabsTrigger value="landing">Landing (legacy)</TabsTrigger>
+          <TabsTrigger value="landing">Landing (partly used)</TabsTrigger>
           <TabsTrigger value="about">About</TabsTrigger>
           <TabsTrigger value="support">Support</TabsTrigger>
           <TabsTrigger value="terms">Terms</TabsTrigger>
@@ -64,9 +66,11 @@ export default async function SiteContentSettingsPage() {
           <TermsContentForm content={content.termsContent} />
         </TabsContent>
         <TabsContent value="debrief">
+          <NotUsedNote where="the participant outreach flow (Outreach → Debrief); this text only feeds the old /debrief page" />
           <DebriefContentForm content={content.debriefContent} />
         </TabsContent>
         <TabsContent value="entry">
+          <NotUsedNote where="the session's wheel configuration (result explanation); the confirmation page no longer reads this text" />
           <EntryReceivedContentForm content={content.entryReceivedContent} />
         </TabsContent>
         <TabsContent value="brand">

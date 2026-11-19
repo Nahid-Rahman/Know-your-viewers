@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Controller } from "react-hook-form";
 import { updateSiteContent, type LandingContentValues } from "@/lib/actions/site-content";
-import { ContentSection as Section, RemoveRowButton } from "@/features/researcher/content-form-shared";
+import { ContentSection as Section, LiveOnSiteNote, NotUsedNote, RemoveRowButton } from "@/features/researcher/content-form-shared";
 
 const schema = z.object({
   heroHeadline: z.string().min(1, "Required."),
@@ -81,6 +81,7 @@ export function SiteContentForm({ content }: { content: LandingContentValues }) 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
       <div className="rounded-xl border border-border bg-card p-6">
+        <NotUsedNote />
         <p className="mb-4 font-semibold">Hero</p>
         <div className="space-y-4">
           <div>
@@ -108,7 +109,7 @@ export function SiteContentForm({ content }: { content: LandingContentValues }) 
         </div>
       </div>
 
-      <Section title="Trust badges" onAdd={() => trustBadges.append({ icon: "★", title: "", description: "" })}>
+      <Section title="Trust badges" note={<LiveOnSiteNote />} onAdd={() => trustBadges.append({ icon: "★", title: "", description: "" })}>
         {trustBadges.fields.map((field, i) => (
           <div key={field.id} className="flex items-start gap-2 rounded-lg border border-border p-3">
             <Input className="w-16" placeholder="Icon" {...form.register(`trustBadges.${i}.icon`)} />
@@ -120,7 +121,7 @@ export function SiteContentForm({ content }: { content: LandingContentValues }) 
       </Section>
 
       <Section
-        title="Game categories"
+        title="Game categories" note={<LiveOnSiteNote />}
         onAdd={() =>
           gameCategories.append({ icon: "🎮", image: "/images/categories/cs-shooter.jpg", tag: "", title: "", description: "" })
         }
@@ -138,7 +139,7 @@ export function SiteContentForm({ content }: { content: LandingContentValues }) 
       </Section>
 
       <Section
-        title="Reward pool"
+        title="Reward pool" note={<NotUsedNote />}
         onAdd={() => rewardPool.append({ label: "", sub: "", rarity: "common" })}
       >
         {rewardPool.fields.map((field, i) => (
@@ -167,7 +168,7 @@ export function SiteContentForm({ content }: { content: LandingContentValues }) 
         ))}
       </Section>
 
-      <Section title="Favourite game type options" onAdd={() => gameTypeOptions.append({ value: "" })}>
+      <Section title="Favourite game type options" note={<NotUsedNote where="the entry form code (this field is no longer on the form)" />} onAdd={() => gameTypeOptions.append({ value: "" })}>
         {gameTypeOptions.fields.map((field, i) => (
           <div key={field.id} className="flex items-center gap-2">
             <Input {...form.register(`gameTypeOptions.${i}.value`)} />
@@ -177,7 +178,7 @@ export function SiteContentForm({ content }: { content: LandingContentValues }) 
       </Section>
 
       <Section
-        title="Livestream frequency options"
+        title="Livestream frequency options" note={<NotUsedNote where="the entry form code (this field is no longer on the form)" />}
         onAdd={() => watchFrequencyOptions.append({ value: "" })}
       >
         {watchFrequencyOptions.fields.map((field, i) => (
@@ -188,7 +189,7 @@ export function SiteContentForm({ content }: { content: LandingContentValues }) 
         ))}
       </Section>
 
-      <Section title="FAQ" onAdd={() => faqItems.append({ q: "", a: "" })}>
+      <Section title="FAQ" note={<NotUsedNote />} onAdd={() => faqItems.append({ q: "", a: "" })}>
         {faqItems.fields.map((field, i) => (
           <div key={field.id} className="space-y-2 rounded-lg border border-border p-3">
             <div className="flex items-center gap-2">
