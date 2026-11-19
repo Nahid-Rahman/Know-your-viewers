@@ -174,7 +174,7 @@ export const DEFAULT_SITE_CONTENT: SiteContentValues = {
     steps: [
       { title: "Choose a Reward Pool", description: "Open the reward event and review the featured drop categories before you roll." },
       { title: "Spin the Reward Roll", description: "Hit SPIN and watch the carousel land on your viewer reward result." },
-      { title: "Submit for Follow-up", description: "Provide your email and phone so the admin team can contact you after verification." },
+      { title: "Submit Your Details", description: "Submit your details for a chance to win prizes. The admin team will contact you after verification." },
     ],
     infoRequiredEyebrow: "INFORMATION REQUIRED",
     infoRequiredTitle: "Only basic follow-up details",
