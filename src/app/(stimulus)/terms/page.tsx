@@ -112,7 +112,7 @@ export default async function TermsPage() {
         <div className="card-border flex flex-col justify-between rounded-xl p-6">
           <div>
             <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-purple/10 text-lg text-purple">
-              🔒
+              🎁
             </span>
             <h2 className="mb-2 text-lg font-bold">{terms.ctaTitle}</h2>
             <p className="mb-6 text-sm text-muted-foreground">{terms.ctaDescription}</p>

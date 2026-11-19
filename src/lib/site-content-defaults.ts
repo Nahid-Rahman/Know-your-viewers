@@ -222,7 +222,7 @@ export const DEFAULT_SITE_CONTENT: SiteContentValues = {
     section1Eyebrow: "SECTION 01",
     section1Title: "Event Terms Summary",
     section1Description:
-      "LiveDrop Arena is a viewer reward event interface. Reward availability may vary by campaign, reward pool, and verification status. Submitting an entry gives a chance to win prizes; not every entry wins. Submitting an entry does not require payment or account login.",
+      "LiveDrop Arena is a viewer reward event interface. Reward availability may vary by campaign, reward pool, and verification status. Submitting an entry gives a chance to win prizes (not every entry wins) and does not require payment or account login.",
     summaryItems: [
       "One viewer entry can be submitted through the event form",
       "Reward results are saved for follow-up verification",
