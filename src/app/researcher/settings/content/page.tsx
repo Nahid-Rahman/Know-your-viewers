@@ -66,7 +66,7 @@ export default async function SiteContentSettingsPage() {
           <TermsContentForm content={content.termsContent} />
         </TabsContent>
         <TabsContent value="debrief">
-          <NotUsedNote where="the participant outreach flow (Outreach → Debrief); this text only feeds the old /debrief page" />
+          <NotUsedNote where="the participant outreach flow (Outreach → Debrief); the old /debrief page now redirects to the homepage" />
           <DebriefContentForm content={content.debriefContent} />
         </TabsContent>
         <TabsContent value="entry">
