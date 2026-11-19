@@ -163,7 +163,7 @@ export const DEFAULT_SITE_CONTENT: SiteContentValues = {
     heroEyebrow: "ABOUT THE EVENT",
     heroTitle: "Viewer Rewards,\n**Made Simple.**",
     heroSubtext:
-      "LiveDrop Arena is a livestream viewer reward event interface where participants can spin for a viewer drop and submit one contact method for follow-up verification.",
+      "LiveDrop Arena is a livestream viewer reward event interface where participants can spin for a viewer drop and submit information to earn a chance to win prizes.",
     liveBadges: ["EVENT LIVE", "FREE TO JOIN", "NO ACCOUNT NEEDED"],
     whatIsEyebrow: "WHAT IS LIVEDROP ARENA?",
     whatIsTitle: "What is LiveDrop Arena?",
