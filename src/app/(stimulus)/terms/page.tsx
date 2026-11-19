@@ -32,13 +32,18 @@ export default async function TermsPage() {
           <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold">
             {terms.heroBadges.map((badge, i) => (
               <span key={badge} className={["text-green", "text-blue", "text-purple"][i % 3]}>
-                {badge}
+                &#9679; {badge}
               </span>
             ))}
           </div>
         </div>
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center justify-self-end rounded-xl border border-primary/30 bg-primary/10 text-2xl">
-          🛡
+        <div className="flex justify-center md:justify-end">
+          <div
+            className="flex h-40 w-40 items-center justify-center rounded-full text-6xl"
+            style={{ backgroundImage: "linear-gradient(to bottom right, var(--primary), var(--primary-dark))" }}
+          >
+            🛡️
+          </div>
         </div>
       </div>
 
@@ -62,9 +67,9 @@ export default async function TermsPage() {
           <h2 className="mb-3 text-lg font-bold">{terms.section2Title}</h2>
           <p className="mb-4 text-sm text-muted-foreground">{terms.section2Description}</p>
           <div className="grid grid-cols-2 gap-2">
-            {terms.infoWeUse.map(({ icon, label }) => (
+            {terms.infoWeUse.map(({ label }) => (
               <div key={label} className="flex items-center gap-2 text-xs">
-                <span className="text-blue">{icon}</span>
+                <span className="text-green">✓</span>
                 {label}
               </div>
             ))}

@@ -218,11 +218,11 @@ export const DEFAULT_SITE_CONTENT: SiteContentValues = {
     heroTitle: "Clear rules.\n**Safe participation.**",
     heroSubtext:
       "This page explains what information is used for viewer drop follow-up and what information is never required.",
-    heroBadges: ["🔒 NO PAYMENT REQUIRED", "◯ NO LOGIN NEEDED", "◎ TRANSPARENT POLICY"],
+    heroBadges: ["NO PAYMENT REQUIRED", "NO LOGIN NEEDED", "TRANSPARENT POLICY"],
     section1Eyebrow: "SECTION 01",
     section1Title: "Event Terms Summary",
     section1Description:
-      "LiveDrop Arena is a viewer reward event interface. Reward availability may vary by campaign, reward pool, and verification status. Submitting an entry does not require payment or account login.",
+      "LiveDrop Arena is a viewer reward event interface. Reward availability may vary by campaign, reward pool, and verification status. Submitting an entry gives a chance to win prizes; not every entry wins. Submitting an entry does not require payment or account login.",
     summaryItems: [
       "One viewer entry can be submitted through the event form",
       "Reward results are saved for follow-up verification",
@@ -240,9 +240,9 @@ export const DEFAULT_SITE_CONTENT: SiteContentValues = {
       { icon: "◎", label: "Livestream watching frequency" },
       { icon: "✓", label: "Reward result" },
       { icon: "◯", label: "Response code" },
-      { icon: "☆", label: "Campaign / session identifiers" },
+      { icon: "✓", label: "Campaign / session identifiers (recorded automatically)" },
     ],
-    safetyNoticeEyebrow: "SAFETY NOTICE",
+    safetyNoticeEyebrow: "SECTION 03 · SAFETY NOTICE",
     safetyNoticeTitle: "We never ask for **sensitive account details**",
     safetyNoticeDescription:
       "LiveDrop Arena does not require passwords, OTPs, payment card information, wallet PINs, game account login, national ID, full address, or account connection permissions.",
@@ -259,7 +259,7 @@ export const DEFAULT_SITE_CONTENT: SiteContentValues = {
     section4Title: "Follow-up Contact",
     section4Description:
       "After entry submission, our team may contact the participant regarding the next process after verification. Participants should use their response code when asking about their entry.",
-    sampleResponseCode: "LDA-8K42",
+    sampleResponseCode: "LD-7KQM-3XPA",
     ctaTitle: "Ready to participate?",
     ctaDescription: "Head back to the event to submit your viewer entry or reach out if you need help.",
   },
