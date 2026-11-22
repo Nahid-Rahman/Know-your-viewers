@@ -173,6 +173,55 @@ check("equivalent phone from another browser saved as DUPLICATE linked to the fi
 const rv = await db.query(`SELECT count(*)::int n FROM study_events e JOIN submissions s ON s."visitId" = e."visitId" WHERE s."responseCode" = $1 AND e.type = 'REWARD_SECTION_VIEWED'`, [code1]);
 check("reward-section view recorded after real visibility", rv.rows[0].n === 1);
 
+// Wheel spin failure recovery (Fix B). CDP Fetch fails the spin server action
+// either before it reaches the server or after the server saved the result.
+async function spinFailure(stage) {
+  const ctx = await browser.createBrowserContext();
+  const page = await ctx.newPage();
+  await page.setViewport(DESKTOP);
+  await page.goto(`${BASE}/`, { waitUntil: "networkidle0" });
+  await page.waitForFunction(() => !document.querySelector("#spin button")?.hasAttribute("disabled"), { timeout: 20000 });
+  const count = async () => (await db.query(`SELECT count(*)::int n FROM spin_outcomes`)).rows[0].n;
+  const before = await count();
+  const cdp = await page.createCDPSession();
+  let failed = 0;
+  cdp.on("Fetch.requestPaused", async (e) => {
+    const isAction = e.request.method === "POST" && Object.keys(e.request.headers).some((h) => h.toLowerCase() === "next-action");
+    if (isAction && failed === 0) {
+      failed++;
+      await cdp.send("Fetch.failRequest", { requestId: e.requestId, errorReason: "ConnectionReset" });
+    } else if (e.responseStatusCode !== undefined) {
+      await cdp.send("Fetch.continueResponse", { requestId: e.requestId }).catch(() => cdp.send("Fetch.continueRequest", { requestId: e.requestId }));
+    } else {
+      await cdp.send("Fetch.continueRequest", { requestId: e.requestId });
+    }
+  });
+  await cdp.send("Fetch.enable", { patterns: [{ urlPattern: "*", requestStage: stage }] });
+  await page.click("#spin button");
+  await page.waitForFunction(() => document.querySelector('#spin-status[role="alert"]'), { timeout: 15000 });
+  const st = await page.evaluate(() => ({
+    msg: document.querySelector("#spin-status")?.textContent ?? "",
+    btn: document.querySelector("#spin button")?.textContent ?? "",
+    disabled: document.querySelector("#spin button")?.hasAttribute("disabled"),
+    dialog: Boolean(document.querySelector('[role="dialog"]')),
+  }));
+  const tag = stage === "Request" ? "lost before server" : "lost after server saved";
+  check(`spin failure (${tag}): error announced, button usable again, no form`, failed === 1 && /Couldn't reach the server/.test(st.msg) && /Spin the wheel/.test(st.btn) && !st.disabled && !st.dialog, JSON.stringify(st));
+  if (stage === "Request") await shot(page, "desktop-08-spin-failed", false);
+  const mid = await count();
+  check(`spin failure (${tag}): server spin count as expected`, mid - before === (stage === "Request" ? 0 : 1), `${mid - before}`);
+  await page.click("#spin button");
+  await page.waitForSelector('[role="dialog"]', { timeout: 20000 });
+  const after = await count();
+  check(`spin failure (${tag}): retry opens the form with exactly one stored spin`, after - before === 1, `${after - before}`);
+  const alertGone = await page.evaluate(() => !document.querySelector('#spin-status[role="alert"]'));
+  check(`spin failure (${tag}): error cleared after retry`, alertGone);
+  await cdp.send("Fetch.disable");
+  await ctx.close();
+}
+await spinFailure("Request");
+await spinFailure("Response");
+
 // Admin pages (dev auth as the seeded researcher).
 const admin = await browser.newPage();
 for (const [vp, label] of [[DESKTOP, "desktop"], [MOBILE, "mobile"]]) {
