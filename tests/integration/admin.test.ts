@@ -290,4 +290,39 @@ describe("retention", () => {
     expect(c.encryptedPhone).toBeNull();
     expect(c.encryptedEmail).toBeNull();
   });
+
+  it("purges only support requests linked to the authorised campaign; other campaigns and unassigned requests are untouched", async () => {
+    const a = await makeActiveStudy();
+    const subA = await submit("01700000040");
+    await closeSessionEntries(a.owner, a.session.id, null);
+    const b = await makeActiveStudy();
+    const subB = await submit("01700000041");
+    const old = new Date(Date.now() - 60 * 86400_000);
+    const mk = (responseCode: string | null) =>
+      prisma.supportRequest.create({ data: { issueType: "Other", responseCode, encryptedMessage: encryptContact("m"), createdAt: old } });
+    const reqA = await mk(subA.responseCode);
+    const reqB = await mk(subB.responseCode); // same day as reqA
+    const reqNone = await mk(null);
+    const reqUnknown = await mk("LD-ZZZZ-ZZZZ");
+    for (const exp of [a.experiment.id, b.experiment.id]) {
+      await prisma.studyPolicyDecision.create({ data: { experimentId: exp, key: "RETENTION", status: "APPROVED", value: { supportDays: 30 } } });
+    }
+
+    // B's owner can't run A's retention at all.
+    await expect(retentionRun(b.owner, a.experiment.id, { dryRun: true })).rejects.toThrow(/not permitted/);
+
+    const preview = await retentionRun(a.owner, a.experiment.id, { dryRun: true });
+    expect(preview.supportRequestsToPurge).toBe(1);
+    expect(preview.supportRequestsUnassignedSkipped).toBe(2);
+    const done = await retentionRun(a.owner, a.experiment.id, { dryRun: false });
+    expect(done.supportRequestsToPurge).toBe(preview.supportRequestsToPurge);
+
+    const after = new Map((await prisma.supportRequest.findMany()).map((r) => [r.id, r]));
+    expect(after.get(reqA.id)!.purgedAt).not.toBeNull();
+    expect(after.get(reqA.id)!.encryptedMessage).toBeNull();
+    for (const r of [reqB, reqNone, reqUnknown]) {
+      expect(after.get(r.id)!.purgedAt).toBeNull();
+      expect(after.get(r.id)!.encryptedMessage).not.toBeNull();
+    }
+  });
 });

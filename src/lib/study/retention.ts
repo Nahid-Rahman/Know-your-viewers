@@ -1,15 +1,47 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@/generated/prisma/client";
 import { audit, assertExperimentAccess, type Actor } from "./access";
 import { approvedRetention, type PolicyRecord } from "./policy";
 
 const DAY = 24 * 60 * 60 * 1000;
+
+type Db = Prisma.TransactionClient | typeof prisma;
+
+/**
+ * Support requests that PROVABLY belong to one campaign and are past the
+ * cutoff. A request belongs to a campaign only when its response code matches
+ * a submission of that campaign (response codes are globally unique). Requests
+ * with no code, or a code that matches no submission, are "unassigned" and are
+ * never selected by a campaign-scoped run — fail closed. The same function
+ * feeds the preview and the execution, so the dry-run count is the set purged.
+ */
+export async function campaignSupportPurgeCandidates(db: Db, experimentId: string, cutoff: Date) {
+  const candidates = await db.supportRequest.findMany({
+    where: { createdAt: { lt: cutoff }, purgedAt: null },
+    select: { id: true, responseCode: true },
+  });
+  const codes = [...new Set(candidates.map((c) => c.responseCode).filter((c): c is string => Boolean(c)))];
+  const owners = codes.length
+    ? await db.submission.findMany({ where: { responseCode: { in: codes } }, select: { responseCode: true, experimentId: true } })
+    : [];
+  const ownerByCode = new Map(owners.map((o) => [o.responseCode, o.experimentId]));
+  const ids: string[] = [];
+  let unassigned = 0;
+  for (const c of candidates) {
+    const owner = c.responseCode ? ownerByCode.get(c.responseCode) : undefined;
+    if (!owner) unassigned++;
+    else if (owner === experimentId) ids.push(c.id);
+  }
+  return { ids, unassigned };
+}
 
 /**
  * Retention clean-up driven only by APPROVED retention periods — no period is
  * assumed. Categories without an approved number of days are skipped and
  * reported as undecided. Always preview (dryRun) before executing. Backups
  * taken earlier are NOT affected; see README "Backups and retention".
+ * Everything is scoped to `experimentId`; access is re-checked server-side.
  */
 export async function retentionRun(actor: Actor, experimentId: string, opts: { dryRun: boolean; now?: Date }) {
   await assertExperimentAccess(actor, experimentId, "contact");
@@ -51,7 +83,7 @@ export async function retentionRun(actor: Actor, experimentId: string, opts: { d
       }
     : null;
   const eventWhere = eventCutoff ? { experimentId, occurredAt: { lt: eventCutoff } } : null;
-  const supportWhere = supportCutoff ? { createdAt: { lt: supportCutoff }, purgedAt: null } : null;
+  const support = supportCutoff ? await campaignSupportPurgeCandidates(prisma, experimentId, supportCutoff) : { ids: [], unassigned: 0 };
 
   const plan = {
     decided: days !== null,
@@ -60,8 +92,10 @@ export async function retentionRun(actor: Actor, experimentId: string, opts: { d
     phonesHeldForUnpaidWinners: phoneTargets.length - phoneIds.length,
     optionalFieldRowsToClear: optionalWhere ? await prisma.submissionContact.count({ where: optionalWhere }) : 0,
     eventsToDelete: eventWhere ? await prisma.studyEvent.count({ where: eventWhere }) : 0,
-    // Support requests aren't tied to one campaign; included for completeness.
-    supportRequestsToPurge: supportWhere ? await prisma.supportRequest.count({ where: supportWhere }) : 0,
+    // Only requests whose response code links them to this campaign.
+    supportRequestsToPurge: support.ids.length,
+    // Past the cutoff but not linked to any campaign: never purged by a campaign run.
+    supportRequestsUnassignedSkipped: support.unassigned,
     undecided: [
       !days?.contactDays && "contact (phone)",
       !days?.optionalFieldDays && "optional fields",
@@ -85,11 +119,15 @@ export async function retentionRun(actor: Actor, experimentId: string, opts: { d
       });
     }
     if (eventWhere) await tx.studyEvent.deleteMany({ where: eventWhere });
-    if (supportWhere) {
-      await tx.supportRequest.updateMany({
-        where: supportWhere,
-        data: { emailOrPhone: null, message: null, streamNickname: null, encryptedContact: null, encryptedMessage: null, encryptedNickname: null, purgedAt: now },
-      });
+    if (supportCutoff) {
+      // Re-select inside the transaction with the same scoped rule.
+      const { ids } = await campaignSupportPurgeCandidates(tx, experimentId, supportCutoff);
+      if (ids.length) {
+        await tx.supportRequest.updateMany({
+          where: { id: { in: ids }, purgedAt: null },
+          data: { emailOrPhone: null, message: null, streamNickname: null, encryptedContact: null, encryptedMessage: null, encryptedNickname: null, purgedAt: now },
+        });
+      }
     }
     await audit(tx, { actorId: actor.id, action: "RETENTION_EXECUTED", entityType: "Experiment", entityId: experimentId, experimentId, detail: plan });
   });

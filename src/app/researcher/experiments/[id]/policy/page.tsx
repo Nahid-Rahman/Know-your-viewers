@@ -82,7 +82,14 @@ export default async function PolicyPage({ params }: PageProps<"/researcher/expe
                 <li>Phone numbers to remove: {retention.phonesToRemove} (held for unpaid winners: {retention.phonesHeldForUnpaidWinners})</li>
                 <li>Submissions with optional fields to clear: {retention.optionalFieldRowsToClear}</li>
                 <li>Website events to delete: {retention.eventsToDelete}</li>
-                <li>Support requests to purge: {retention.supportRequestsToPurge}</li>
+                <li>
+                  Support requests to purge (linked to this campaign by response code): {retention.supportRequestsToPurge}
+                  {retention.supportRequestsUnassignedSkipped > 0 && (
+                    <span className="block text-xs text-muted-foreground">
+                      {retention.supportRequestsUnassignedSkipped} older request(s) aren&apos;t linked to any campaign and are left untouched by campaign clean-up.
+                    </span>
+                  )}
+                </li>
               </ul>
               {retention.undecided.length > 0 && <p className="mt-1 text-xs text-amber-300">Undecided (skipped): {retention.undecided.join(", ")}</p>}
               <div className="mt-3">
