@@ -34,7 +34,10 @@ export type StudyHomeProps = {
 };
 
 export function StudyHome(props: StudyHomeProps) {
-  const { visitId, track } = useStudyVisit({ refCode: props.refCode, renderedConfigId: props.configId });
+  const { visitId, track, status: visitStatus, error: visitError, retry: retryVisit } = useStudyVisit({
+    refCode: props.refCode,
+    renderedConfigId: props.configId,
+  });
   const rewardRef = useRef<HTMLElement>(null);
   useSectionViewed(rewardRef, Boolean(visitId), () => track({ type: "REWARD_SECTION_VIEWED" }));
 
@@ -45,7 +48,12 @@ export function StudyHome(props: StudyHomeProps) {
   const [formOpen, setFormOpen] = useState(false);
 
   async function handleSpin() {
-    if (!visitId || spinning) return;
+    if (!visitId) {
+      // Visit setup failed: the button retries it instead of staying disabled.
+      if (visitStatus === "error") retryVisit();
+      return;
+    }
+    if (spinning) return;
     if (landed) {
       setFormOpen(true);
       track({ type: "FORM_OPENED" });
@@ -53,13 +61,23 @@ export function StudyHome(props: StudyHomeProps) {
     }
     setSpinning(true);
     setSpinError(null);
-    const r = await spinWheel(visitId);
-    if (!r.ok) {
-      setSpinError(r.error);
-      setSpinning(false);
-      return;
+    let accepted = false;
+    try {
+      const r = await spinWheel(visitId);
+      if (!r.ok) {
+        setSpinError(r.error);
+        return;
+      }
+      // The server stores one result per visit; a retry after a lost response
+      // gets the same stored result back, never a second spin.
+      accepted = true;
+      setTarget({ key: r.resultKey, label: r.resultLabel });
+    } catch {
+      setSpinError("Couldn't reach the server. Check your connection and press Spin again.");
+    } finally {
+      // On success the wheel keeps spinning until it lands (handleLanded).
+      if (!accepted) setSpinning(false);
     }
-    setTarget({ key: r.resultKey, label: r.resultLabel });
   }
 
   function handleLanded() {
@@ -109,7 +127,8 @@ export function StudyHome(props: StudyHomeProps) {
           <Button
             size="lg"
             onClick={handleSpin}
-            disabled={!visitId || spinning}
+            disabled={(!visitId && visitStatus !== "error") || spinning}
+            aria-describedby="spin-status"
             className={cn(
               "mt-10 h-16 w-full max-w-xs rounded-full bg-gradient-primary text-base font-black tracking-wide text-white uppercase shadow-[0_0_44px_-10px_var(--primary)] transition-transform hover:opacity-90 active:scale-95 disabled:opacity-90 sm:w-auto sm:px-16",
               !spinning && visitId && "animate-pulse-glow",
@@ -118,10 +137,16 @@ export function StudyHome(props: StudyHomeProps) {
             <span aria-hidden className={cn("mr-2 inline-block", spinning && "animate-spin-slow")}>
               🎰
             </span>
-            {spinning ? "Spinning…" : landed ? "Enter the draw" : "Spin the wheel"}
+            {spinning ? "Spinning…" : landed ? "Enter the draw" : !visitId && visitStatus === "error" ? "Try again" : "Spin the wheel"}
           </Button>
-          <p className="mx-auto mt-4 max-w-md text-xs text-muted-foreground" aria-live="polite">
+          <p
+            id="spin-status"
+            className={cn("mx-auto mt-4 max-w-md text-xs", spinError || (!visitId && visitError) ? "text-destructive" : "text-muted-foreground")}
+            aria-live="polite"
+            role={spinError || (!visitId && visitError) ? "alert" : undefined}
+          >
             {spinError ??
+              (!visitId && visitError) ??
               (landed && target
                 ? "Enter the draw with your details — winners are picked at random after the session."
                 : "🍀 Feeling lucky? Hit spin and see what drops for you!")}

@@ -2,6 +2,8 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { analyticsPhase } from "./session-state";
+import { describeDurations, FUNNEL_GROUPS, funnelGroupFor, type FunnelGroup } from "./activity";
+import { PUBLIC_ROUTE_KEYS, type PublicRouteKey } from "./constants";
 
 /**
  * Website funnel for one study session. Every stage counts DISTINCT VISITS
@@ -156,4 +158,105 @@ export async function phaseSplit(sessionId: string) {
   for (const x of visits) v[analyticsPhase(session, x.startedAt)]++;
   for (const x of subs) s[analyticsPhase(session, x.submittedAt)]++;
   return { visits: v, canonicalSubmissions: s, hasActualStart: Boolean(session.actualStartAt), hasActualEnd: Boolean(session.actualEndAt) };
+}
+
+/**
+ * Outcome of submit attempts for one session. "Attempted" counts every
+ * intentional submit since 2026-11-22 (valid or not); before that only
+ * client-valid submits were logged, so older attempt counts are lower bounds.
+ */
+export async function attemptOutcomes(sessionId: string) {
+  const types = ["SUBMISSION_ATTEMPTED", "SUBMISSION_VALIDATION_FAILED", "SUBMISSION_REJECTED", "SUBMISSION_SAVED"] as const;
+  const [rows, reasons] = await Promise.all([
+    prisma.$queryRaw<{ type: string; events: bigint; visits: bigint }[]>`
+      SELECT type::text AS type, COUNT(*) AS events, COUNT(DISTINCT "visitId") AS visits
+      FROM study_events
+      WHERE "streamSessionId" = ${sessionId}
+        AND type::text IN ('SUBMISSION_ATTEMPTED', 'SUBMISSION_VALIDATION_FAILED', 'SUBMISSION_REJECTED', 'SUBMISSION_SAVED')
+      GROUP BY type`,
+    prisma.$queryRaw<{ reason: string; n: bigint }[]>`
+      SELECT r AS reason, COUNT(*) AS n
+      FROM study_events, unnest(string_to_array(detail ->> 'reasons', ',')) AS r
+      WHERE "streamSessionId" = ${sessionId} AND type::text = 'SUBMISSION_VALIDATION_FAILED'
+      GROUP BY r ORDER BY r`,
+  ]);
+  const by = new Map(rows.map((r) => [r.type, { events: Number(r.events), visits: Number(r.visits) }]));
+  return {
+    stages: types.map((t) => ({ type: t, ...(by.get(t) ?? { events: 0, visits: 0 }) })),
+    // Count of failed attempts mentioning each reason (an attempt can have several).
+    validationReasons: reasons.map((r) => ({ reason: r.reason, attempts: Number(r.n) })),
+  };
+}
+
+type GroupStats = {
+  group: FunnelGroup;
+  visits: number;
+  /** Share of all comparable visits in scope (denominator: `comparableVisits`). */
+  share: number | null;
+  /** Estimated visible time on all public pages, seconds. */
+  visible: ReturnType<typeof describeDurations>;
+  /** Estimated visible time on the homepage only, seconds. */
+  homeVisible: ReturnType<typeof describeDurations>;
+  /** Elapsed visit duration (first to last signal), seconds. */
+  elapsed: ReturnType<typeof describeDurations>;
+};
+
+/**
+ * Engagement by furthest stage, per VISIT (not person, not submission):
+ *   NEVER_REACHED_REWARD                     no reward-section view recorded
+ *   REACHED_REWARD_NO_SUCCESSFUL_SUBMISSION  reward section viewed, nothing saved
+ *   SUCCESSFULLY_SUBMITTED                   at least one submission saved
+ * Each visit is in exactly one group. Only measurementVersion-2 visits (all
+ * public pages, per-route split) are compared; older homepage-only visits are
+ * counted separately as `legacyVisits` and never pooled in.
+ */
+export async function durationGroups(sessionIds: string[]) {
+  if (!sessionIds.length) return { comparableVisits: 0, legacyVisits: 0, groups: emptyGroups(), routes: emptyRoutes() };
+  const rows = await prisma.$queryRaw<{ id: string; ver: number; active: number; route: unknown; elapsed: number; submitted: boolean; reward: boolean }[]>`
+    SELECT v.id, v."measurementVersion" AS ver, v."activeMs" AS active, v."routeActiveMs" AS route,
+      (EXTRACT(EPOCH FROM (v."lastSeenAt" - v."startedAt")) * 1000)::float AS elapsed,
+      EXISTS (SELECT 1 FROM submissions s WHERE s."visitId" = v.id) AS submitted,
+      EXISTS (SELECT 1 FROM study_events e WHERE e."visitId" = v.id AND e.type::text = 'REWARD_SECTION_VIEWED') AS reward
+    FROM visits v
+    WHERE v."streamSessionId" = ANY(${sessionIds}::text[])`;
+  const comparable = rows.filter((r) => r.ver >= 2);
+  const routeMs = (r: (typeof rows)[number], k: PublicRouteKey) => {
+    const v = (r.route as Record<string, unknown> | null)?.[k];
+    return typeof v === "number" ? v : 0;
+  };
+  const groups: GroupStats[] = FUNNEL_GROUPS.map((group) => {
+    const g = comparable.filter((r) => funnelGroupFor({ submitted: r.submitted, reachedReward: r.reward }) === group);
+    return {
+      group,
+      visits: g.length,
+      share: comparable.length ? g.length / comparable.length : null,
+      visible: describeDurations(g.map((r) => r.active / 1000)),
+      homeVisible: describeDurations(g.map((r) => routeMs(r, "home") / 1000)),
+      elapsed: describeDurations(g.map((r) => r.elapsed / 1000)),
+    };
+  });
+  const routes = Object.fromEntries(
+    PUBLIC_ROUTE_KEYS.map((k) => {
+      const seen = comparable.filter((r) => routeMs(r, k) > 0);
+      return [k, { visitsWithTime: seen.length, visible: describeDurations(seen.map((r) => routeMs(r, k) / 1000)) }];
+    }),
+  ) as Record<PublicRouteKey, { visitsWithTime: number; visible: ReturnType<typeof describeDurations> }>;
+  return { comparableVisits: comparable.length, legacyVisits: rows.length - comparable.length, groups, routes };
+}
+
+function emptyGroups(): GroupStats[] {
+  return FUNNEL_GROUPS.map((group) => ({
+    group,
+    visits: 0,
+    share: null,
+    visible: describeDurations([]),
+    homeVisible: describeDurations([]),
+    elapsed: describeDurations([]),
+  }));
+}
+function emptyRoutes() {
+  return Object.fromEntries(PUBLIC_ROUTE_KEYS.map((k) => [k, { visitsWithTime: 0, visible: describeDurations([]) }])) as Record<
+    PublicRouteKey,
+    { visitsWithTime: number; visible: ReturnType<typeof describeDurations> }
+  >;
 }

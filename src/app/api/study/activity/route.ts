@@ -5,10 +5,13 @@ import { findVisitorByToken, getLiveVisit, recordActivity, VISITOR_COOKIE } from
 import { recordStudyEvent } from "@/lib/study/events";
 import { allowRequest, PUBLIC_LIMITS } from "@/lib/study/rate-limit";
 import { prisma } from "@/lib/prisma";
+import { PUBLIC_ROUTE_KEYS } from "@/lib/study/constants";
 
 const bodySchema = z.object({
   visitId: z.string().uuid(),
   kind: z.enum(["visible", "heartbeat", "hidden"]),
+  // Allow-listed route key the credited time belongs to (never a URL).
+  route: z.enum(PUBLIC_ROUTE_KEYS).optional(),
 });
 
 /**
@@ -35,7 +38,7 @@ export async function POST(request: Request) {
     return new NextResponse(null, { status: 429 });
   }
 
-  await recordActivity(visit.id, parsed.data.kind);
+  await recordActivity(visit.id, parsed.data.kind, parsed.data.route ?? null);
   if (parsed.data.kind !== "heartbeat") {
     await recordStudyEvent(prisma, visit, { type: parsed.data.kind === "hidden" ? "PAGE_HIDDEN" : "PAGE_VISIBLE" });
   }

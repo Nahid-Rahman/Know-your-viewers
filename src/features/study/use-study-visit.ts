@@ -1,75 +1,23 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { logStudyEvent, startVisit } from "@/lib/actions/study-public";
-import { HEARTBEAT_INTERVAL_MS } from "@/lib/study/constants";
-import type { ClientEvent } from "@/lib/study/events-client";
-
-function sendActivity(visitId: string, kind: "visible" | "heartbeat" | "hidden", beacon = false) {
-  const body = JSON.stringify({ visitId, kind });
-  if (beacon && typeof navigator !== "undefined" && navigator.sendBeacon) {
-    navigator.sendBeacon("/api/study/activity", new Blob([body], { type: "application/json" }));
-    return;
-  }
-  void fetch("/api/study/activity", { method: "POST", body, keepalive: true, headers: { "Content-Type": "application/json" } }).catch(
-    () => {},
-  );
-}
+import { useEffect, useRef } from "react";
+import { useVisit } from "./visit-provider";
 
 /**
- * Starts (or resumes) the visit after hydration, then reports visibility and
- * a heartbeat every 15 s while the tab is visible. Hidden tabs send nothing,
- * so background time is not counted as active.
+ * Homepage hook: starts (or resumes) the visit after hydration. Visibility,
+ * heartbeats and per-route time are handled by VisitProvider in the public
+ * layout, so they continue across About/Terms/Support/confirmation.
  */
 export function useStudyVisit(opts: { refCode: string | null; renderedConfigId: string }) {
-  const router = useRouter();
-  const [visitId, setVisitId] = useState<string | null>(null);
+  const visit = useVisit();
+  const { start } = visit;
   const started = useRef(false);
-
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    void startVisit({ ref: opts.refCode, referrer: document.referrer || null, renderedConfigId: opts.renderedConfigId }).then((r) => {
-      if (!r.ok) return;
-      if (r.configChanged) {
-        router.refresh();
-        return;
-      }
-      setVisitId(r.visitId);
-      void logStudyEvent(r.visitId, { type: "LANDING_VIEWED" });
-      if (opts.refCode) {
-        // Drop ?ref= from the address bar so shared links don't carry it on.
-        const url = new URL(window.location.href);
-        url.searchParams.delete("ref");
-        window.history.replaceState(null, "", url.toString());
-      }
-    });
-  }, [opts.refCode, opts.renderedConfigId, router]);
-
-  useEffect(() => {
-    if (!visitId) return;
-    if (document.visibilityState === "visible") sendActivity(visitId, "visible");
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") sendActivity(visitId, "heartbeat");
-    }, HEARTBEAT_INTERVAL_MS);
-    const onVisibility = () => sendActivity(visitId, document.visibilityState === "visible" ? "visible" : "hidden");
-    const onPageHide = () => sendActivity(visitId, "hidden", true);
-    document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("pagehide", onPageHide);
-    return () => {
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("pagehide", onPageHide);
-    };
-  }, [visitId]);
-
-  return {
-    visitId,
-    track: (event: ClientEvent) => {
-      if (visitId) void logStudyEvent(visitId, event);
-    },
-  };
+    start({ refCode: opts.refCode, renderedConfigId: opts.renderedConfigId });
+  }, [opts.refCode, opts.renderedConfigId, start]);
+  return visit;
 }
 
 /**

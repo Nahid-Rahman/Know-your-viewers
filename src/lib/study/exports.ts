@@ -9,7 +9,7 @@ import { analyticsPhase } from "./session-state";
 import { currentPermissions } from "./permissions";
 import { evaluateResearchEligibility, REASON_ORDER } from "./eligibility";
 import { eligibilityStats } from "./research-eligibility";
-import { sessionFunnel, submissionSummary, phaseSplit } from "./stats";
+import { attemptOutcomes, durationGroups, sessionFunnel, submissionSummary, phaseSplit } from "./stats";
 
 export const STUDY_EXPORTS = {
   "research-submissions": {
@@ -166,6 +166,25 @@ export async function buildStudyExport(actor: Actor, type: StudyExportType, expe
       for (const [phase, n] of Object.entries(ph.visits)) rows.push([...base, `visits_${phase.toLowerCase()}`, n, "by visit start vs recorded actual times"]);
       for (const [phase, n] of Object.entries(ph.canonicalSubmissions)) {
         rows.push([...base, `canonical_submissions_${phase.toLowerCase()}`, n, "by submission time vs recorded actual times"]);
+      }
+      const [att, dg] = await Promise.all([attemptOutcomes(s.id), durationGroups([s.id])]);
+      for (const st of att.stages) {
+        rows.push([...base, `${st.type.toLowerCase()}_events`, st.events, "event count (attempts include invalid submits since 2026-11-22)"]);
+        rows.push([...base, `${st.type.toLowerCase()}_visits`, st.visits, "distinct visits"]);
+      }
+      for (const r of att.validationReasons) rows.push([...base, `validation_reason_${r.reason.toLowerCase()}`, r.attempts, "failed attempts with this reason; reasons overlap"]);
+      rows.push([...base, "duration_comparable_visits", dg.comparableVisits, "visits measured on all public pages (v2); denominator for group shares"]);
+      rows.push([...base, "duration_legacy_visits", dg.legacyVisits, "homepage-only visits before 2026-11-22; not in groups"]);
+      const r1 = (x: number | null) => (x === null ? "" : Math.round(x * 10) / 10);
+      for (const g of dg.groups) {
+        const k = `group_${g.group.toLowerCase()}`;
+        rows.push([...base, `${k}_visits`, g.visits, "distinct visits in this group"]);
+        rows.push([...base, `${k}_share`, r1(g.share === null ? null : g.share * 100), "% of duration_comparable_visits"]);
+        rows.push([...base, `${k}_visible_mean_s`, r1(g.visible.mean), "estimated visible time, all public pages"]);
+        rows.push([...base, `${k}_visible_median_s`, r1(g.visible.median), "estimated visible time, all public pages"]);
+        rows.push([...base, `${k}_visible_p90_s`, r1(g.visible.p90), "estimated visible time, all public pages"]);
+        rows.push([...base, `${k}_home_visible_median_s`, r1(g.homeVisible.median), "estimated visible time, homepage only"]);
+        rows.push([...base, `${k}_elapsed_median_s`, r1(g.elapsed.median), "elapsed visit duration (not attention)"]);
       }
     }
   } else if (type === "duplicate-statistics") {

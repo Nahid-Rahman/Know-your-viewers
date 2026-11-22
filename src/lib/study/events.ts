@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { TRACKABLE_FIELDS } from "./constants";
+import { INVALID_REASON_CODES, PUBLIC_ROUTE_KEYS, TRACKABLE_FIELDS } from "./constants";
 import type { Prisma } from "@/generated/prisma/client";
 
 /**
@@ -18,6 +18,12 @@ export const clientEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("FORM_CLOSED") }),
   z.object({ type: z.literal("FIELD_INTERACTED"), element: z.enum(TRACKABLE_FIELDS) }),
   z.object({ type: z.literal("SUBMISSION_ATTEMPTED") }),
+  // Bounded reason codes only, never the typed values.
+  z.object({
+    type: z.literal("SUBMISSION_VALIDATION_FAILED"),
+    reasons: z.array(z.enum(INVALID_REASON_CODES)).min(1).max(INVALID_REASON_CODES.length),
+  }),
+  z.object({ type: z.literal("ROUTE_VIEWED"), element: z.enum(PUBLIC_ROUTE_KEYS) }),
   z.object({ type: z.literal("CONFIRMATION_VIEWED") }),
 ]);
 

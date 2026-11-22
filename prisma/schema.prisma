@@ -951,22 +951,28 @@ enum AttributionSource {
 // event/heartbeat. Created only by client-side JS (startVisit), so server
 // renders and link-preview bots do not create visits.
 model Visit {
-  id                String            @id @default(uuid())
-  visitorId         String
-  experimentId      String
-  streamSessionId   String
-  configId          String
-  attributionSource AttributionSource
-  trackingLinkId    String?
+  id                 String            @id @default(uuid())
+  visitorId          String
+  experimentId       String
+  streamSessionId    String
+  configId           String
+  attributionSource  AttributionSource
+  trackingLinkId     String?
   // For STALE_TRACKING_LINK / UNKNOWN_TRACKING_CODE: the code as received (max 64 chars).
-  receivedRefCode   String?
-  referrerHost      String?
-  startedAt         DateTime          @default(now())
-  lastSeenAt        DateTime          @default(now())
+  receivedRefCode    String?
+  referrerHost       String?
+  startedAt          DateTime          @default(now())
+  lastSeenAt         DateTime          @default(now())
   // Estimated visible time: heartbeat-credited, capped per interval, merged
   // across tabs (never summed per tab). See src/lib/study/activity.ts.
-  activeMs          Int               @default(0)
-  activeCreditAt    DateTime?
+  activeMs           Int               @default(0)
+  activeCreditAt     DateTime?
+  // Same credits split by allow-listed public route key ("home", "about",
+  // "terms", "support", "confirmation"). Only filled for measurementVersion 2.
+  routeActiveMs      Json              @default("{}")
+  // 1 = homepage-only visible time (before 2026-11-22); 2 = all public pages,
+  // with per-route split. Don't pool the two without saying so.
+  measurementVersion Int               @default(1)
 
   visitor       BrowserVisitor @relation(fields: [visitorId], references: [id], onDelete: Restrict)
   experiment    Experiment     @relation(fields: [experimentId], references: [id], onDelete: Restrict)
@@ -999,6 +1005,10 @@ enum StudyEventType {
   CONFIRMATION_VIEWED
   PAGE_HIDDEN
   PAGE_VISIBLE
+  // Client-side route change between allow-listed public pages (element = route key).
+  ROUTE_VIEWED
+  // Submit pressed but the form failed client validation (detail.reasons = bounded codes).
+  SUBMISSION_VALIDATION_FAILED
 }
 
 // Bounded, server-validated events. `element` is restricted to a whitelist
@@ -1142,6 +1152,7 @@ model Submission {
   @@index([experimentId, phoneHash])
   @@index([streamSessionId, submittedAt])
   @@index([canonicalId])
+  @@index([visitId])
   @@map("submissions")
 }
 

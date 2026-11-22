@@ -4,7 +4,8 @@ import { StatusBadge } from "@/components/common/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireExperimentPage } from "@/lib/study/researcher";
 import { getPolicies, getSessionDetail } from "@/lib/study/admin-queries";
-import { durationSummary, phaseSplit, sessionFunnel, submissionSummary, trafficSeries, BUCKET_OPTIONS } from "@/lib/study/stats";
+import { attemptOutcomes, durationGroups, durationSummary, phaseSplit, sessionFunnel, submissionSummary, trafficSeries, BUCKET_OPTIONS } from "@/lib/study/stats";
+import { EngagementGroupsCard } from "@/features/study-admin/engagement-groups-card";
 import { blockingPoliciesForLive, POLICY_DEFINITIONS } from "@/lib/study/policy";
 import { entryState } from "@/lib/study/session-state";
 import { formatStudyTime, toStudyLocalInput } from "@/lib/study/time";
@@ -55,7 +56,7 @@ export default async function SessionDetailPage({ params, searchParams }: PagePr
   const rewardApproved = records.find((r) => r.key === "REWARD_PRESENTATION")?.status === "APPROVED";
   const entry = entryState(session, new Date());
 
-  const [funnel, summary, durations, phases, traffic, elStats] = isStudy
+  const [funnel, summary, durations, phases, traffic, elStats, groups, attempts] = isStudy
     ? await Promise.all([
         sessionFunnel(sessionId),
         submissionSummary({ streamSessionId: sessionId }),
@@ -64,8 +65,10 @@ export default async function SessionDetailPage({ params, searchParams }: PagePr
         trafficSeries(sessionId, bucket),
         // A TEST session's records are all TEST, so include them here.
         eligibilityStats({ experimentId: id, streamSessionId: sessionId, includeTest: true }),
+        durationGroups([sessionId]),
+        attemptOutcomes(sessionId),
       ])
-    : [null, null, null, null, null, null];
+    : [null, null, null, null, null, null, null, null];
 
   const cfg = session.currentConfig;
   const homepage = cfg ? homepageContentSchema.safeParse(cfg.homepageContent) : null;
@@ -243,7 +246,8 @@ export default async function SessionDetailPage({ params, searchParams }: PagePr
                 </p>
               </div>
               <div>
-                <p className="mb-1 font-medium">Visit duration (n = {durations.elapsed.n})</p>
+                <p className="mb-1 font-medium">Visit duration, all visits pooled (n = {durations.elapsed.n})</p>
+                <p className="text-xs text-muted-foreground">Visits before 2026-11-22 count homepage time only; see &ldquo;Engagement by furthest stage&rdquo; for the comparable split.</p>
                 <p className="text-muted-foreground">
                   Elapsed median {secs(durations.elapsed.median)} · mean {secs(durations.elapsed.mean)} · p90 {secs(durations.elapsed.p90)}
                 </p>
@@ -289,6 +293,8 @@ export default async function SessionDetailPage({ params, searchParams }: PagePr
           </div>
         </Card>
       )}
+
+      {isStudy && groups && attempts && <EngagementGroupsCard groups={groups} attempts={attempts} />}
 
       {isStudy && elStats && <EligibilityStatsCard stats={elStats} scopeLabel="this session" />}
 

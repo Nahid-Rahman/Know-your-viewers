@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { ACTIVE_CREDIT_CAP_MS, VISIT_INACTIVITY_TIMEOUT_MS } from "./constants";
+import { ACTIVE_CREDIT_CAP_MS, MEASUREMENT_VERSION, VISIT_INACTIVITY_TIMEOUT_MS, type PublicRouteKey } from "./constants";
 import { hashVisitorToken, newVisitorToken } from "./keys";
 
 export const VISITOR_COOKIE = "ldv";
@@ -87,9 +87,22 @@ export async function startOrResumeVisit(input: {
       referrerHost: input.referrerHost?.slice(0, 120) ?? null,
       startedAt: now,
       lastSeenAt: now,
+      measurementVersion: MEASUREMENT_VERSION,
     },
   });
   return { visit, visitorId: visitor.id, newToken, resumed: false };
+}
+
+/**
+ * For public pages other than the homepage: continue this browser's live
+ * visit to the active session, if there is one. Never creates a visit or a
+ * visitor; visits start on the homepage only.
+ */
+export async function resumeLiveVisit(visitorId: string, sessionId: string, now = new Date()) {
+  return prisma.visit.findFirst({
+    where: { visitorId, streamSessionId: sessionId, lastSeenAt: { gte: new Date(now.getTime() - VISIT_INACTIVITY_TIMEOUT_MS) } },
+    orderBy: { lastSeenAt: "desc" },
+  });
 }
 
 /** A visit owned by this browser that has not timed out. */
@@ -106,8 +119,14 @@ export async function getLiveVisit(visitId: string, visitorId: string, now = new
  * `timestamp without time zone` holding UTC (Prisma's convention), so the
  * SQL writes `now() AT TIME ZONE 'UTC'` rather than relying on the database
  * session's timezone being UTC.
+ *
+ * The credit is the time since the previous credit for the whole visit,
+ * clamped to [0, ACTIVE_CREDIT_CAP_MS]. With `route`, the same credit is also
+ * added to routeActiveMs[route]. Because the clock is shared per visit, an
+ * overlapping heartbeat and route flush (or two tabs) can't count the same
+ * seconds twice, and no client clock is trusted.
  */
-export async function recordActivity(visitId: string, kind: "visible" | "heartbeat" | "hidden") {
+export async function recordActivity(visitId: string, kind: "visible" | "heartbeat" | "hidden", route: PublicRouteKey | null = null) {
   if (kind === "visible") {
     await prisma.$executeRaw`
       UPDATE visits SET "lastSeenAt" = (now() AT TIME ZONE 'UTC'),
@@ -115,10 +134,16 @@ export async function recordActivity(visitId: string, kind: "visible" | "heartbe
       WHERE id = ${visitId}`;
     return;
   }
+  // Every SET expression sees the pre-update row, so the credit is the same in both.
   await prisma.$executeRaw`
     UPDATE visits SET
       "activeMs" = "activeMs" + CASE WHEN "activeCreditAt" IS NULL THEN 0
         ELSE LEAST(GREATEST((EXTRACT(EPOCH FROM ((now() AT TIME ZONE 'UTC') - "activeCreditAt")) * 1000)::int, 0), ${ACTIVE_CREDIT_CAP_MS}) END,
+      "routeActiveMs" = CASE WHEN ${route}::text IS NULL OR "activeCreditAt" IS NULL THEN "routeActiveMs"
+        ELSE jsonb_set("routeActiveMs", ARRAY[${route}::text], to_jsonb(
+          COALESCE(("routeActiveMs" ->> ${route}::text)::int, 0)
+          + LEAST(GREATEST((EXTRACT(EPOCH FROM ((now() AT TIME ZONE 'UTC') - "activeCreditAt")) * 1000)::int, 0), ${ACTIVE_CREDIT_CAP_MS})
+        )) END,
       "activeCreditAt" = CASE WHEN ${kind} = 'hidden' THEN NULL ELSE (now() AT TIME ZONE 'UTC') END,
       "lastSeenAt" = (now() AT TIME ZONE 'UTC')
     WHERE id = ${visitId}`;

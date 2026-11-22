@@ -9,6 +9,7 @@ import {
   findVisitorByToken,
   getActiveStudySession,
   getLiveVisit,
+  resumeLiveVisit,
   startOrResumeVisit,
   VISITOR_COOKIE,
   VISITOR_COOKIE_MAX_AGE,
@@ -66,6 +67,19 @@ export async function startVisit(input: { ref?: string | null; referrer?: string
   };
 }
 
+/**
+ * Public pages other than the homepage: continue this browser's live visit so
+ * About/Terms/Support/confirmation time is measured. Never creates a visit.
+ */
+export async function resumeVisit() {
+  const visitor = await currentVisitor();
+  if (!visitor) return { ok: false as const };
+  const session = await getActiveStudySession();
+  if (!session) return { ok: false as const };
+  const visit = await resumeLiveVisit(visitor.id, session.id);
+  return visit ? { ok: true as const, visitId: visit.id } : { ok: false as const };
+}
+
 /** Bounded client events — see clientEventSchema. Silently ignores anything invalid. */
 export async function logStudyEvent(visitId: string, event: unknown): Promise<void> {
   const parsed = clientEventSchema.safeParse(event);
@@ -80,6 +94,7 @@ export async function logStudyEvent(visitId: string, event: unknown): Promise<vo
   await recordStudyEvent(prisma, visit, {
     type: parsed.data.type,
     element: "element" in parsed.data ? parsed.data.element : null,
+    detail: "reasons" in parsed.data ? { reasons: [...new Set(parsed.data.reasons)].sort().join(",") } : undefined,
   }).catch(() => {});
   await prisma.visit.update({ where: { id: visit.id }, data: { lastSeenAt: new Date() } }).catch(() => {});
 }

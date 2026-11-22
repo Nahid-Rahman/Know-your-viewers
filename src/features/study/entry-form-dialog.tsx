@@ -2,14 +2,14 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { LightFieldLabel, LightInput } from "@/components/common/light-field";
 import { submitStudyEntry } from "@/lib/actions/study-public";
 import { AGE_GROUP_OPTIONS, FIELD_LIMITS, type TrackableField } from "@/lib/study/constants";
-import { entryFormSchema, type EntryFormInput, type EntryFormValues } from "@/lib/study/submission-schema";
+import { entryFormSchema, invalidReasonCodes, type EntryFormInput, type EntryFormValues } from "@/lib/study/submission-schema";
 import type { ClientEvent } from "@/lib/study/events-client";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +55,9 @@ export function EntryFormDialog({
     track({ type: "FIELD_INTERACTED", element: field });
   }
 
+  // Each intentional submit (button or Enter) runs exactly one of onSubmit /
+  // onInvalid, so every attempt is logged once, valid or not. Telemetry is
+  // fire-and-forget and never blocks the submission.
   async function onSubmit(values: EntryFormValues) {
     if (!visitId || submitting) return;
     setSubmitting(true);
@@ -74,6 +77,14 @@ export function EntryFormDialog({
       setServerError("Couldn't reach the server. Check your connection and press Submit again.");
       setSubmitting(false);
     }
+  }
+
+  function onInvalid(errs: FieldErrors<EntryFormInput>) {
+    if (!visitId || submitting) return;
+    track({ type: "SUBMISSION_ATTEMPTED" });
+    // Reason codes only (e.g. PHONE_INVALID); the typed values never leave the browser.
+    const reasons = invalidReasonCodes(Object.keys(errs), form.getValues());
+    if (reasons.length) track({ type: "SUBMISSION_VALIDATION_FAILED", reasons });
   }
 
   return (
@@ -96,7 +107,7 @@ export function EntryFormDialog({
           <DialogDescription>{result ? result.explanation : "Leave your details to enter the draw."}</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-4" noValidate>
           <div>
             <LightFieldLabel htmlFor="entry-name">Your name (required)</LightFieldLabel>
             <LightInput

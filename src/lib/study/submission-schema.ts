@@ -8,7 +8,7 @@
 //   6. Social contact (optional): Discord username and/or Facebook profile
 
 import { z } from "zod";
-import { FIELD_LIMITS } from "./constants";
+import { FIELD_LIMITS, type InvalidReasonCode } from "./constants";
 import { normalizePhone } from "./phone";
 
 const optionalText = (max: number) =>
@@ -53,3 +53,22 @@ export const entryFormSchema = z
 
 export type EntryFormInput = z.input<typeof entryFormSchema>;
 export type EntryFormValues = z.output<typeof entryFormSchema>;
+
+/**
+ * Bounded reason codes for a failed client-side validation. Uses the values
+ * only to tell "missing" from "invalid"; returns codes, never values.
+ */
+export function invalidReasonCodes(fields: string[], values: Partial<Record<string, unknown>>): InvalidReasonCode[] {
+  const empty = (k: string) => typeof values[k] !== "string" || (values[k] as string).trim() === "";
+  const out = new Set<InvalidReasonCode>();
+  for (const f of fields) {
+    if (f === "name") out.add(empty("name") ? "NAME_MISSING" : "NAME_INVALID");
+    else if (f === "phone") out.add(empty("phone") ? "PHONE_MISSING" : "PHONE_INVALID");
+    else if (f === "ageGroup") out.add("AGE_MISSING");
+    else if (f === "email") out.add("EMAIL_INVALID");
+    else if (f === "ign") out.add("IGN_INVALID");
+    else if (f === "discord") out.add("DISCORD_INVALID");
+    else if (f === "facebook") out.add("FACEBOOK_INVALID");
+  }
+  return [...out].sort();
+}
