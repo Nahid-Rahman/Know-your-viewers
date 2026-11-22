@@ -5,7 +5,7 @@ import { CodeBlock } from "@/components/common/code-block";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
-import { AGE_GROUP_LABELS } from "@/lib/study/constants";
+import { AGE_GROUP_LABELS, DRAW_TIMING_COPY } from "@/lib/study/constants";
 import { maskPhone } from "@/lib/study/phone";
 import { parseRewardConfig } from "@/lib/study/reward";
 import { recordStudyEvent } from "@/lib/study/events";
@@ -72,7 +72,7 @@ export default async function SubmissionReceivedPage({ searchParams }: PageProps
             <span className="text-muted-foreground">Wheel result: </span>
             <span className="font-semibold">{submission.spinOutcome.resultLabel}</span>
             <span className="block text-xs text-muted-foreground">
-              The wheel result is not a draw win. Winners are drawn at random from valid entries after the session.
+              The wheel result is not a draw win. {DRAW_TIMING_COPY}
             </span>
           </p>
         )}

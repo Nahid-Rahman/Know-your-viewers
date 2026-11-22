@@ -174,7 +174,7 @@ export const DEFAULT_SITE_CONTENT: SiteContentValues = {
     steps: [
       { title: "Choose a Reward Pool", description: "Open the reward event and review the featured drop categories before you roll." },
       { title: "Spin the Reward Roll", description: "Hit SPIN and watch the carousel land on your viewer reward result." },
-      { title: "Submit Your Details", description: "Enter your name, phone number and age group to join the prize draw. Winners are picked at random after the session and contacted by phone." },
+      { title: "Submit Your Details", description: "Enter your name, phone number and age group to join the prize draw. Winners will be selected through a random draw after the campaign's entry collection has closed. The draw will take place within one week of that closure. Winners are contacted by phone." },
     ],
     infoRequiredEyebrow: "INFORMATION REQUIRED",
     infoRequiredTitle: "Only basic entry details",
@@ -206,7 +206,7 @@ export const DEFAULT_SITE_CONTENT: SiteContentValues = {
       "Send a short support request about your entry. Our team will get back to you using the contact details you provide.",
     infoCards: [
       { icon: "📄", title: "Entry Follow-up", description: "Use your response code if you need help checking the status of your viewer drop entry." },
-      { icon: "✓", title: "Prize Draw", description: "Winners are drawn at random from valid entries after the session and contacted by phone." },
+      { icon: "✓", title: "Prize Draw", description: "Winners will be selected through a random draw after the campaign's entry collection has closed. The draw will take place within one week of that closure. Winners are contacted by phone." },
       { icon: "🛡", title: "Safe Support", description: "Support will never ask for your password, OTP, payment details, or game account login." },
     ],
     formFooterText: "Our team will reply using the phone number or email you provide.",
@@ -225,7 +225,7 @@ export const DEFAULT_SITE_CONTENT: SiteContentValues = {
       "LiveDrop Arena is a viewer reward event interface. Submitting an entry gives a chance to win prizes (not every entry wins) and does not require payment or account login.",
     summaryItems: [
       "One entry per person can be submitted through the event form",
-      "Winners are drawn at random from valid entries after the session",
+      "Winners will be selected through a random draw after the campaign's entry collection has closed. The draw will take place within one week of that closure.",
       "Winners are contacted by phone on the number they provided",
       "Cash rewards are sent to the winner's bKash number",
     ],
@@ -260,7 +260,7 @@ export const DEFAULT_SITE_CONTENT: SiteContentValues = {
     section4Eyebrow: "SECTION 04",
     section4Title: "Follow-up Contact",
     section4Description:
-      "After the session, winners are drawn at random and contacted by phone. Use your response code when contacting support about your entry.",
+      "Winners will be selected through a random draw after the campaign's entry collection has closed. The draw will take place within one week of that closure. Winners are contacted by phone. Use your response code when contacting support about your entry.",
     sampleResponseCode: "LD-7KQM-3XPA",
     ctaTitle: "Ready to participate?",
     ctaDescription: "Head back to the event to submit your viewer entry or reach out if you need help.",

@@ -1,6 +1,13 @@
 // Shared constants for the revised (session-configured) study flow. Plain
 // module — safe to import from client components.
 
+/**
+ * Approved draw-timing copy (2026-11-22). Keep the meaning unchanged wherever
+ * draw timing is described: one draw per campaign, after collection closes.
+ * It promises when the DRAW happens, not when prizes are paid.
+ */
+export const DRAW_TIMING_COPY = "Winners will be selected through a random draw after the campaign's entry collection has closed. The draw will take place within one week of that closure.";
+
 /** A visit ends after this long without any event or heartbeat from the browser. */
 export const VISIT_INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
 

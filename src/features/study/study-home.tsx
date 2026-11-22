@@ -14,6 +14,7 @@ import { StudyHero } from "./study-hero";
 import { TrustBadgesSection } from "@/features/stimulus/sections/trust-badges-section";
 import { CategoriesSection } from "@/features/stimulus/sections/categories-section";
 import { cn } from "@/lib/utils";
+import { DRAW_TIMING_COPY } from "@/lib/study/constants";
 
 export type SiteSections = {
   trustBadges: { icon: string; title: string; description: string }[];
@@ -148,7 +149,7 @@ export function StudyHome(props: StudyHomeProps) {
             {spinError ??
               (!visitId && visitError) ??
               (landed && target
-                ? "Enter the draw with your details — winners are picked at random after the session."
+                ? `Enter the draw with your details. ${DRAW_TIMING_COPY}`
                 : "🍀 Feeling lucky? Hit spin and see what drops for you!")}
           </p>
         </div>

@@ -55,7 +55,7 @@ export const DEFAULT_REWARD_CONFIG: RewardConfig = {
   fixedResultKey: BKASH_REWARD_KEY,
   resultHeadline: "You landed the bKash Reward!",
   resultExplanation:
-    "Submitting this form enters you into a random draw for a bKash reward, held after the session ends. Not every entrant wins — selected winners receive the reward on their bKash number. We will never ask for your bKash PIN, OTP or password.",
+    "Submitting this form enters you into the bKash reward draw. Winners will be selected through a random draw after the campaign's entry collection has closed. The draw will take place within one week of that closure. Not every entrant wins — selected winners receive the reward on their bKash number. We will never ask for your bKash PIN, OTP or password.",
 };
 
 export function parseRewardConfig(value: unknown): RewardConfig {

@@ -22,20 +22,20 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
   // "**…**" renders in the brand gradient (RichHeadline); "\n" breaks lines.
   heroHeadline: "SPIN FOR\nYOUR\n**VIEWER DROP**\nTODAY!",
   heroSubtext:
-    "Spin the wheel and leave your information for a chance to win a prize from the prize pool. Winners are picked at random after the session.",
+    "Spin the wheel and leave your information for a chance to win a prize from the prize pool. Winners will be selected through a random draw after the campaign's entry collection has closed.",
   howItWorks: [
     "Spin the reward wheel.",
     "Fill up the form.",
-    "After the session, winners are drawn at random from the prize pool and contacted by phone.",
+    "Winners will be selected through a random draw after the campaign's entry collection has closed. The draw will take place within one week of that closure.",
   ],
   faqItems: [
     {
       q: "Does everyone win?",
-      a: "No. Every valid entry goes into a random draw after the session, and only the selected winners receive a prize from the prize pool.",
+      a: "No. Only the selected winners receive a prize from the prize pool. Winners will be selected through a random draw after the campaign's entry collection has closed. The draw will take place within one week of that closure.",
     },
     {
       q: "How soon will I get my reward?",
-      a: "Winners are contacted by phone and receive their reward within 1 week after the stream ends.",
+      a: "Winners will be selected through a random draw after the campaign's entry collection has closed. The draw will take place within one week of that closure. Winners are then contacted by phone.",
     },
     {
       q: "Do optional fields improve my chances?",

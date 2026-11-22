@@ -51,7 +51,7 @@ export async function loadPublicPage(now = new Date()): Promise<PublicPageState>
         homepage: {
           ...DEFAULT_HOMEPAGE_CONTENT,
           heroSubtext:
-            "During a collaborating streamer's session you can spin the wheel and leave your phone number for a chance to win a prize from the prize pool. Winners are picked at random after each session.",
+            "During a collaborating streamer's session you can spin the wheel and leave your phone number for a chance to win a prize from the prize pool. Winners will be selected through a random draw after the campaign's entry collection has closed.",
         },
         reelItems: toReelItems(DEFAULT_REWARD_CONFIG.displayItems),
         statusTitle: "Entries open during the next collaborating stream",
