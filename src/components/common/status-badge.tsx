@@ -35,6 +35,10 @@ const STATUS_CLASSES: Record<string, string> = {
 
   // Research eligibility (not a DB enum value — passed in directly)
   ELIGIBLE: "bg-accent-green/10 text-accent-green border-accent-green/30",
+  RESEARCH_ELIGIBLE: "bg-accent-green/10 text-accent-green border-accent-green/30",
+  NOT_ELIGIBLE: "bg-destructive/10 text-destructive border-destructive/30",
+  MANUAL_EXCLUSION: "bg-destructive/10 text-destructive border-destructive/30",
+  NEEDS_REVIEW: "bg-amber-400/10 text-amber-300 border-amber-400/30",
   // Revised study flow
   CLOSED: "bg-muted text-muted-foreground border-border",
   TEST: "bg-amber-400/10 text-amber-300 border-amber-400/30",

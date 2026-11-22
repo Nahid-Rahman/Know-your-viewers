@@ -23,6 +23,8 @@ import { SessionConfigEditor } from "@/features/study-admin/session-config-edito
 import { AnnotationForm, PlatformMetricForm } from "@/features/study-admin/session-records-forms";
 import { TrafficChart } from "@/features/study-admin/traffic-chart";
 import { cn } from "@/lib/utils";
+import { eligibilityStats } from "@/lib/study/research-eligibility";
+import { EligibilityStatsCard } from "@/features/study-admin/eligibility-stats-card";
 
 export const dynamic = "force-dynamic";
 
@@ -53,15 +55,17 @@ export default async function SessionDetailPage({ params, searchParams }: PagePr
   const rewardApproved = records.find((r) => r.key === "REWARD_PRESENTATION")?.status === "APPROVED";
   const entry = entryState(session, new Date());
 
-  const [funnel, summary, durations, phases, traffic] = isStudy
+  const [funnel, summary, durations, phases, traffic, elStats] = isStudy
     ? await Promise.all([
         sessionFunnel(sessionId),
         submissionSummary({ streamSessionId: sessionId }),
         durationSummary(sessionId),
         phaseSplit(sessionId),
         trafficSeries(sessionId, bucket),
+        // A TEST session's records are all TEST, so include them here.
+        eligibilityStats({ experimentId: id, streamSessionId: sessionId, includeTest: true }),
       ])
-    : [null, null, null, null, null];
+    : [null, null, null, null, null, null];
 
   const cfg = session.currentConfig;
   const homepage = cfg ? homepageContentSchema.safeParse(cfg.homepageContent) : null;
@@ -285,6 +289,8 @@ export default async function SessionDetailPage({ params, searchParams }: PagePr
           </div>
         </Card>
       )}
+
+      {isStudy && elStats && <EligibilityStatsCard stats={elStats} scopeLabel="this session" />}
 
       {isStudy && !cfg && session.status !== "ARCHIVED" && (
         <Card title="Homepage & wheel configuration">

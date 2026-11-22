@@ -5,7 +5,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { prisma } from "@/lib/prisma";
 import { researcherScope } from "@/lib/study/researcher";
 import { getAuditEntries, getSubmissionDetail, getVisitTimeline } from "@/lib/study/admin-queries";
-import { currentPermissions } from "@/lib/study/submission-admin";
+import { currentPermissions } from "@/lib/study/permissions";
+import { ELIGIBILITY_REASONS, REVIEW_FLAGS, type EligibilityReason } from "@/lib/study/eligibility";
+import { evaluateRows } from "@/lib/study/research-eligibility";
+import { UNDER18_CONTACT_BLOCKED } from "@/lib/study/submission-admin";
 import { AGE_GROUP_LABELS } from "@/lib/study/constants";
 import { maskPhone } from "@/lib/study/phone";
 import { analyticsPhase } from "@/lib/study/session-state";
@@ -66,15 +69,18 @@ export default async function SubmissionDetailPage({ params }: PageProps<"/resea
     prisma.user.findMany({ where: { role: "RESEARCHER" }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
   const perms = currentPermissions(s.permissions);
+  // Same evaluator as the list, the research export and the stats.
+  const el = (await evaluateRows([s])).get(s.id)!;
+  const has = (r: EligibilityReason) => el.reasons.includes(r);
   const checks: [string, boolean][] = [
-    ["Canonical (not a duplicate)", s.status === "CANONICAL"],
-    ["Live data (not TEST)", !s.isTest],
-    ["Adult age group (detailed under-18 records are excluded)", s.ageGroup !== "BELOW_18"],
-    ["Website-data use GRANTED", perms.WEBSITE_DATA_USE === "GRANTED"],
-    ["Not manually excluded", !s.researchExcluded],
-    ["Research data not purged", !s.researchDataPurgedAt],
+    ["Canonical (not a duplicate)", !has("DUPLICATE")],
+    ["Live data (not TEST)", !has("TEST_CAMPAIGN")],
+    ["Adult age group (detailed under-18 records are excluded)", !has("UNDER_18")],
+    ["Website-data use GRANTED", !has("PERMISSION_PENDING") && !has("PERMISSION_DECLINED_OR_WITHDRAWN")],
+    ["Not manually excluded", !has("MANUALLY_EXCLUDED")],
+    ["Research data not purged", !has("RESEARCH_DATA_PURGED")],
   ];
-  const researchEligible = checks.every(([, ok]) => ok);
+  const under18 = s.ageGroup === "BELOW_18";
   const win = s.drawWins.find((w) => w.draw.status === "FINALIZED");
 
   return (
@@ -147,11 +153,12 @@ export default async function SubmissionDetailPage({ params }: PageProps<"/resea
               ))}
             </p>
           )}
-          {canContact && (
+          {canContact && !under18 && (
             <div className="mt-4">
               <RevealContact submissionId={s.id} />
             </div>
           )}
+          {under18 && <p className="mt-4 text-xs text-amber-300">{UNDER18_CONTACT_BLOCKED}</p>}
         </Section>
 
         <Section title="Attribution (provenance)">
@@ -178,11 +185,38 @@ export default async function SubmissionDetailPage({ params }: PageProps<"/resea
             </li>
           ))}
         </ul>
-        <p className="mb-3 text-sm">
-          Result: <StatusBadge status={researchEligible ? "ELIGIBLE" : "EXCLUDED"} />
+        <p className="mb-2 text-sm">
+          Result: <StatusBadge status={el.status === "ELIGIBLE" ? "RESEARCH_ELIGIBLE" : el.status} />
           {s.researchExcluded && ` (manual: ${s.researchExclusionReason?.replace(/_/g, " ").toLowerCase()}${s.researchExclusionNote ? ` — ${s.researchExclusionNote}` : ""})`}
         </p>
-        {canWrite && <ResearchExclusionForm submissionId={s.id} excluded={s.researchExcluded} />}
+        {el.reasons.length > 0 && (
+          <ul className="mb-2 list-disc pl-5 text-xs text-muted-foreground">
+            {el.reasons.map((r) => (
+              <li key={r}>{ELIGIBILITY_REASONS[r]}</li>
+            ))}
+          </ul>
+        )}
+        {el.reviewFlags.length > 0 && (
+          <div className="mb-3 rounded-lg border border-amber-400/40 bg-amber-400/10 p-2 text-xs">
+            <p className="font-semibold">Needs review (not an automatic exclusion):</p>
+            <ul className="list-disc pl-5">
+              {el.reviewFlags.map((f) => (
+                <li key={f}>{REVIEW_FLAGS[f]}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <p className="mb-3 text-xs text-muted-foreground">
+          Under-18, duplicate, TEST, permission and purge reasons come from recorded facts — fix the facts (permission record, canonical
+          correction) rather than overriding them. A manual exclusion only adds a reason.
+        </p>
+        {canWrite && (
+          <ResearchExclusionForm
+            submissionId={s.id}
+            excluded={s.researchExcluded}
+            detected={el.reasons.filter((r) => r !== "MANUALLY_EXCLUDED").map((r) => ELIGIBILITY_REASONS[r])}
+          />
+        )}
         {canContact && (perms.WEBSITE_DATA_USE === "DECLINED" || perms.WEBSITE_DATA_USE === "WITHDRAWN") && !s.researchDataPurgedAt && (
           <div className="mt-3">
             <PurgeResearchData submissionId={s.id} />
@@ -229,7 +263,8 @@ export default async function SubmissionDetailPage({ params }: PageProps<"/resea
       </Section>
 
       <Section title="Follow-up and interviews">
-        {canWrite && (
+        {under18 && <p className="mb-3 text-sm text-amber-300">{UNDER18_CONTACT_BLOCKED}</p>}
+        {canWrite && !under18 && (
           <FollowUpForm
             submissionId={s.id}
             researchers={researchers}
@@ -251,7 +286,7 @@ export default async function SubmissionDetailPage({ params }: PageProps<"/resea
           ))}
           {s.attempts.length === 0 && <li className="text-muted-foreground">None.</li>}
         </ul>
-        {canWrite && <AttemptForm submissionId={s.id} />}
+        {canWrite && !under18 && <AttemptForm submissionId={s.id} />}
         <h3 className="mt-4 mb-2 text-sm font-semibold">Interviews</h3>
         <ul className="mb-2 space-y-2 text-sm">
           {s.interviews.map((i) => (
@@ -264,18 +299,28 @@ export default async function SubmissionDetailPage({ params }: PageProps<"/resea
           ))}
           {s.interviews.length === 0 && <li className="text-muted-foreground">None.</li>}
         </ul>
-        {canWrite && <InterviewForm submissionId={s.id} />}
+        {canWrite && !under18 && <InterviewForm submissionId={s.id} />}
       </Section>
 
       <Section title="Reward">
         <dl className="mb-3">
           <Row label="Draw eligibility">
-            {s.status !== "CANONICAL" ? "not eligible (duplicate)" : s.isTest ? "test draws only" : s.drawExcluded ? `excluded — ${s.drawExclusionNote ?? ""}` : "eligible"}
+            {s.status !== "CANONICAL"
+              ? "not eligible (duplicate)"
+              : under18
+                ? "not eligible (under 18)"
+                : s.drawExcluded
+                  ? `excluded — ${s.drawExclusionNote ?? ""}`
+                  : s.isTest
+                    ? "test draws only"
+                    : "eligible"}
           </Row>
           <Row label="Winner">{win ? `Yes — rank ${win.rank} (${formatStudyTime(win.draw.executedAt)})` : "No finalized win"}</Row>
           {win && <Row label="Payout">{`${win.payoutStatus.toLowerCase()}${win.paymentRef ? ` · ref ${win.paymentRef}` : ""}${win.paidAt ? ` · ${formatStudyTime(win.paidAt)}` : ""}`}</Row>}
         </dl>
-        <p className="mb-2 text-xs text-muted-foreground">Research permission, interview participation and optional fields don&apos;t affect draw eligibility.</p>
+        <p className="mb-2 text-xs text-muted-foreground">
+          Research permission, interview participation and optional fields don&apos;t affect draw eligibility. Under-18 entrants are never selected.
+        </p>
         {canContact && s.status === "CANONICAL" && <DrawExclusionForm submissionId={s.id} excluded={s.drawExcluded} />}
       </Section>
 

@@ -40,8 +40,15 @@ export default async function DrawPage({ params }: PageProps<"/researcher/experi
           <h2 className="font-display text-lg font-bold">{label}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Eligible canonical entries: {pre.eligibleCount}
-            {pre.under18Eligible === null ? " (under-18 handling not decided)" : pre.under18Eligible ? " (under-18 included)" : " (under-18 excluded)"}
+            {" "}(under-18 entrants are always excluded)
           </p>
+          {pre.warnings.length > 0 && (
+            <ul className="mt-2 list-disc pl-5 text-sm text-amber-300">
+              {pre.warnings.map((w) => (
+                <li key={w}>{w}</li>
+              ))}
+            </ul>
+          )}
           {pre.problems.length > 0 && (
             <ul className="mt-2 list-disc pl-5 text-sm text-amber-300">
               {pre.problems.map((p) => (

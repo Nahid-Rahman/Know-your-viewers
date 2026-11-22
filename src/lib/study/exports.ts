@@ -6,7 +6,9 @@ import type { Prisma } from "@/generated/prisma/client";
 import { audit, assertExperimentAccess, type Actor, type AccessLevel } from "./access";
 import { AGE_GROUP_LABELS } from "./constants";
 import { analyticsPhase } from "./session-state";
-import { currentPermissions } from "./submission-admin";
+import { currentPermissions } from "./permissions";
+import { evaluateResearchEligibility, REASON_ORDER } from "./eligibility";
+import { eligibilityStats } from "./research-eligibility";
 import { sessionFunnel, submissionSummary, phaseSplit } from "./stats";
 
 export const STUDY_EXPORTS = {
@@ -52,7 +54,10 @@ export const STUDY_EXPORTS = {
 
 export type StudyExportType = keyof typeof STUDY_EXPORTS;
 
-/** The research-eligibility rule, in one place. */
+/**
+ * Database pre-filter for research eligibility. The final decision is always
+ * evaluateResearchEligibility (eligibility.ts) — this only narrows the load.
+ */
 export function researchEligibleWhere(experimentId: string): Prisma.SubmissionWhereInput {
   return {
     experimentId,
@@ -78,9 +83,17 @@ export async function researchEligibleSubmissions(experimentId: string, opts: { 
     },
     orderBy: { submittedAt: "asc" },
   });
-  // Permission-dependent: only GRANTED website-data use. Pending, declined,
-  // withdrawn and unreachable (still pending) are all left out.
-  return rows.filter((r) => currentPermissions(r.permissions).WEBSITE_DATA_USE === "GRANTED");
+  // The shared evaluator decides. Pending, declined, withdrawn and unreachable
+  // (still pending) website-data use are all left out. With includeTest, the
+  // TEST reason alone does not exclude.
+  return rows.filter((r) => {
+    const e = evaluateResearchEligibility(r);
+    return e.reasons.every((reason) => includeTestReason(reason, opts.includeTest));
+  });
+}
+
+function includeTestReason(reason: string, includeTest?: boolean) {
+  return includeTest === true && reason === "TEST_CAMPAIGN";
 }
 
 export async function buildStudyExport(actor: Actor, type: StudyExportType, experimentId: string, includeTest = false) {
@@ -121,6 +134,21 @@ export async function buildStudyExport(actor: Actor, type: StudyExportType, expe
       orderBy: { createdAt: "asc" },
     });
     headers = ["session_id", "streamer", "title", "metric", "value", "denominator_note"];
+    // Campaign-level research-eligibility breakdown (records, not people).
+    const el = await eligibilityStats({ experimentId, includeTest });
+    const all = ["ALL_SESSIONS", "", "campaign total"];
+    rows.push([...all, "submissions_saved", el.saved, "all saved submissions incl. duplicates"]);
+    rows.push([...all, "submissions_canonical", el.canonical, "one per phone per campaign"]);
+    rows.push([...all, "submissions_duplicate", el.duplicates, "genuine repeats (kept, linked to canonical)"]);
+    rows.push([...all, "submissions_test", el.test, includeTest ? "TEST collection included" : "TEST excluded from this export"]);
+    rows.push([...all, "under18_saved", el.under18Saved, "aggregate count only; of submissions_saved"]);
+    rows.push([...all, "under18_canonical", el.under18Canonical, "aggregate count only; of submissions_canonical"]);
+    rows.push([...all, "research_eligible", el.eligible, "of submissions_saved"]);
+    rows.push([...all, "research_pending_permission", el.pending, "only website-data permission missing; of submissions_saved"]);
+    rows.push([...all, "research_not_eligible", el.notEligible, "of submissions_saved"]);
+    rows.push([...all, "research_excluded_unique", el.excludedUnique, "unique records not eligible (pending + not eligible)"]);
+    for (const r of REASON_ORDER) rows.push([...all, `reason_${r.toLowerCase()}`, el.byReason[r], "records with this reason; reasons overlap"]);
+    rows.push([...all, "needs_review", el.needsReview, "flagged for a researcher to look at; not an exclusion"]);
     for (const s of sessions) {
       const [f, sum, ph] = await Promise.all([
         sessionFunnel(s.id),
@@ -156,8 +184,9 @@ export async function buildStudyExport(actor: Actor, type: StudyExportType, expe
       canonVisitors.get(d.canonicalId!) === d.visitorId,
     ]);
   } else if (type === "operational-followup") {
+    // Under-18 entrants are never contacted (owner decision) — not even listed.
     const subs = await prisma.submission.findMany({
-      where: { experimentId, status: "CANONICAL", ...testFilter },
+      where: { experimentId, status: "CANONICAL", ageGroup: { not: "BELOW_18" }, ...testFilter },
       include: { contact: true, followUp: true, permissions: true },
       orderBy: { submittedAt: "asc" },
     });
@@ -172,7 +201,8 @@ export async function buildStudyExport(actor: Actor, type: StudyExportType, expe
     });
   } else if (type === "reward-administration") {
     const winners = await prisma.drawWinner.findMany({
-      where: { draw: { experimentId, status: "FINALIZED", ...(includeTest ? {} : { isTest: false }) } },
+      // Under-18 winners (only possible in draws made before the age rule) are never contacted.
+      where: { draw: { experimentId, status: "FINALIZED", ...(includeTest ? {} : { isTest: false }) }, submission: { ageGroup: { not: "BELOW_18" } } },
       include: { submission: { include: { contact: true } }, draw: { select: { executedAt: true, isTest: true } } },
       orderBy: [{ drawId: "asc" }, { rank: "asc" }],
     });

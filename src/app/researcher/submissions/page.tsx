@@ -8,7 +8,9 @@ import { cn } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
 import { researcherScope } from "@/lib/study/researcher";
 import { listSubmissions, SUBMISSION_PAGE_SIZE, type SubmissionListFilters } from "@/lib/study/admin-queries";
-import { currentPermissions } from "@/lib/study/submission-admin";
+import { currentPermissions } from "@/lib/study/permissions";
+import { ELIGIBILITY_REASONS, REVIEW_FLAGS } from "@/lib/study/eligibility";
+import { BulkExclusionForm } from "@/features/study-admin/bulk-exclusion-form";
 import { AGE_GROUP_LABELS, AGE_GROUP_OPTIONS } from "@/lib/study/constants";
 import { formatStudyTime } from "@/lib/study/time";
 import { QueryFilters, type FilterDef } from "@/features/study-admin/query-filters";
@@ -40,7 +42,8 @@ export default async function SubmissionsPage({ searchParams }: PageProps<"/rese
     page: Number(get("page")) || 1,
   };
 
-  const [{ rows, total, page }, experiments, sessions] = await Promise.all([
+  const { scope: writeScope } = await researcherScope("write");
+  const [{ rows, total, page, eligibility }, experiments, sessions] = await Promise.all([
     listSubmissions(filters),
     prisma.experiment.findMany({ where: { id: { in: scope } }, select: { id: true, title: true }, orderBy: { createdAt: "desc" } }),
     prisma.streamSession.findMany({
@@ -60,7 +63,21 @@ export default async function SubmissionsPage({ searchParams }: PageProps<"/rese
     { key: "ageGroup", label: "Age group", type: "select", options: AGE_GROUP_OPTIONS.map((o) => ({ value: o.value, label: o.label })) },
     { key: "permission", label: "Website-data permission", type: "select", options: ["PENDING", "GRANTED", "DECLINED", "WITHDRAWN"].map((v) => ({ value: v, label: v.toLowerCase() })) },
     { key: "followUp", label: "Follow-up", type: "select", options: ["NOT_CONTACTED", "ATTEMPTING", "REACHED", "INTERVIEW_COMPLETED", "DECLINED_INTERVIEW", "UNREACHABLE"].map((v) => ({ value: v, label: v.replace(/_/g, " ").toLowerCase() })) },
-    { key: "research", label: "Research eligibility", type: "select", options: [{ value: "eligible", label: "Not excluded" }, { value: "excluded", label: "Excluded / purged" }] },
+    {
+      key: "research",
+      label: "Research eligibility",
+      type: "select",
+      options: [
+        { value: "research_eligible", label: "Research eligible" },
+        { value: "pending", label: "Pending permission" },
+        { value: "not_eligible", label: "Not eligible" },
+        { value: "manual", label: "Manual exclusion" },
+        { value: "needs_review", label: "Needs review" },
+        // Older filters, kept with their original meaning (manual flags only).
+        { value: "eligible", label: "Not manually excluded / purged" },
+        { value: "excluded", label: "Manually excluded / purged" },
+      ],
+    },
     { key: "winner", label: "Draw", type: "select", options: [{ value: "winner", label: "Winners" }, { value: "not_winner", label: "Not winners" }] },
     { key: "payout", label: "Payout", type: "select", options: ["PENDING", "PAID", "FAILED", "UNREACHABLE"].map((v) => ({ value: v, label: v.toLowerCase() })) },
     { key: "from", label: "From (Dhaka date)", type: "date" },
@@ -82,6 +99,11 @@ export default async function SubmissionsPage({ searchParams }: PageProps<"/rese
         description="Every saved entry from the revised study flow. Valid (canonical) entries are shown by default; duplicates are kept and listed separately. Phone numbers are masked — reveal them from a submission's detail page (audited)."
       />
       <QueryFilters defs={defs} />
+      <p className="mb-3 text-xs text-muted-foreground">
+        Research column: <strong>Research eligible</strong> = canonical, live, adult, website-data use granted, not excluded or purged.{" "}
+        <strong>Pending</strong> = only the permission is missing. Hover a badge for every reason. Research eligibility doesn&apos;t affect the draw.
+      </p>
+      {rows.length > 0 && writeScope.length > 0 && <BulkExclusionForm />}
       {rows.length === 0 ? (
         <EmptyState title="No submissions match" description="Widen the filters, or include TEST data to see synthetic entries." />
       ) : (
@@ -89,6 +111,7 @@ export default async function SubmissionsPage({ searchParams }: PageProps<"/rese
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-8"><span className="sr-only">Select</span></TableHead>
                 <TableHead>Code</TableHead>
                 <TableHead>Submitted (Dhaka)</TableHead>
                 <TableHead>Streamer / session</TableHead>
@@ -106,8 +129,15 @@ export default async function SubmissionsPage({ searchParams }: PageProps<"/rese
               {rows.map((s) => {
                 const perm = currentPermissions(s.permissions);
                 const win = s.drawWins[0];
+                const el = eligibility.get(s.id)!;
+                const reasonText = [...el.reasons.map((r) => ELIGIBILITY_REASONS[r]), ...el.reviewFlags.map((f) => `Review: ${REVIEW_FLAGS[f]}`)].join(" · ");
                 return (
                   <TableRow key={s.id}>
+                    <TableCell>
+                      {writeScope.includes(s.experimentId) && (
+                        <input type="checkbox" name="ids" value={s.id} form="bulk-exclusion" aria-label={`Select ${s.responseCode}`} className="size-4 accent-primary" />
+                      )}
+                    </TableCell>
                     <TableCell className="font-mono text-xs">
                       <Link href={`/researcher/submissions/${s.id}`} className="hover:underline">{s.responseCode}</Link>
                       {s.isTest && <span className="ml-1 text-[10px] text-amber-300">TEST</span>}
@@ -121,10 +151,13 @@ export default async function SubmissionsPage({ searchParams }: PageProps<"/rese
                     <TableCell><StatusBadge status={s.status} /></TableCell>
                     <TableCell className="font-mono text-xs">{s.canonical?.responseCode ?? "—"}</TableCell>
                     <TableCell>
-                      {s.researchExcluded || s.researchDataPurgedAt ? (
-                        <span title={s.researchExclusionReason ?? "research data purged"}><StatusBadge status="EXCLUDED" /></span>
-                      ) : (
-                        <StatusBadge status="ELIGIBLE" />
+                      <span title={reasonText || "Meets every research-eligibility rule"} className="flex flex-wrap gap-1">
+                        <StatusBadge status={el.status === "ELIGIBLE" ? "RESEARCH_ELIGIBLE" : el.status} />
+                        {el.manual && <StatusBadge status="MANUAL_EXCLUSION" />}
+                        {el.reviewFlags.length > 0 && <StatusBadge status="NEEDS_REVIEW" />}
+                      </span>
+                      {el.reasons.length > 0 && (
+                        <span className="mt-0.5 block text-[10px] text-muted-foreground">{el.reasons.map((r) => r.toLowerCase().replace(/_/g, " ")).join(", ")}</span>
                       )}
                     </TableCell>
                     <TableCell><StatusBadge status={perm.WEBSITE_DATA_USE} /></TableCell>

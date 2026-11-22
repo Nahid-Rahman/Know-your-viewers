@@ -9,14 +9,17 @@ import { StreamSessionDialog } from "@/features/experiment/stream-session-dialog
 import { getExperimentById, getStreamers } from "@/lib/queries/research";
 import { getStudySessions } from "@/lib/study/admin-queries";
 import { formatStudyTime } from "@/lib/study/time";
+import { eligibilityStats } from "@/lib/study/research-eligibility";
+import { EligibilityStatsCard } from "@/features/study-admin/eligibility-stats-card";
 
-export default async function StreamsPage({ params }: PageProps<"/researcher/experiments/[id]/streams">) {
+export default async function StreamsPage({ params, searchParams }: PageProps<"/researcher/experiments/[id]/streams">) {
   const { id } = await params;
+  const includeTest = (await searchParams).includeTest === "1";
   await requireExperimentPage(id);
   const experiment = await getExperimentById(id);
   if (!experiment) notFound();
 
-  const [sessions, allStreamers] = await Promise.all([getStudySessions(id), getStreamers()]);
+  const [sessions, allStreamers, elStats] = await Promise.all([getStudySessions(id), getStreamers(), eligibilityStats({ experimentId: id, includeTest })]);
   // Every non-inactive streamer can be picked; creating a session assigns
   // the streamer to this experiment automatically.
   const pickableStreamers = allStreamers.filter((s) => s.status !== "INACTIVE");
@@ -29,6 +32,13 @@ export default async function StreamsPage({ params }: PageProps<"/researcher/exp
           sessions have no website and only platform metrics. Times are Asia/Dhaka.
         </p>
         <StreamSessionDialog experimentId={id} streamers={pickableStreamers} triggerLabel="New session" />
+      </div>
+
+      <div className="mb-4">
+        <EligibilityStatsCard stats={elStats} scopeLabel="whole campaign" />
+        <Link href={includeTest ? "?" : "?includeTest=1"} className="mt-1 inline-block text-xs text-primary underline">
+          {includeTest ? "Show LIVE records only" : "Include TEST records in these counts"}
+        </Link>
       </div>
 
       {sessions.length === 0 ? (

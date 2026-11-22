@@ -1,7 +1,9 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
-import { currentPermissions, type PermissionStatusValue } from "./submission-admin";
+import { currentPermissions, type PermissionStatusValue } from "./permissions";
+import { matchesResearchFilter, RESEARCH_STATUS_FILTERS, type ResearchStatusFilter } from "./eligibility";
+import { evaluateRows } from "./research-eligibility";
 import { entryState } from "./session-state";
 
 export async function getStudySessions(experimentId: string) {
@@ -45,7 +47,8 @@ export type SubmissionListFilters = {
   ageGroup?: "BELOW_18" | "AGE_18_30" | "AGE_31_PLUS";
   permission?: PermissionStatusValue;
   followUp?: string;
-  research?: "eligible" | "excluded";
+  /** "eligible"/"excluded" = manual exclusion/purge flags only; the rest use the shared evaluator. */
+  research?: "eligible" | "excluded" | ResearchStatusFilter;
   winner?: "winner" | "not_winner";
   payout?: "PENDING" | "PAID" | "FAILED" | "UNREACHABLE";
   from?: string;
@@ -94,15 +97,19 @@ export async function listSubmissions(f: SubmissionListFilters) {
     drawWins: { where: { draw: { status: "FINALIZED" as const } }, select: { payoutStatus: true, rank: true } },
   } satisfies Prisma.SubmissionInclude;
 
-  // Permission filter is on the derived latest status, so it is applied after loading.
-  if (f.permission) {
+  // Permission and research-status filters use derived values, so they are
+  // applied after loading (bounded by the researcher's campaigns).
+  const derived = f.research && (RESEARCH_STATUS_FILTERS as readonly string[]).includes(f.research) ? (f.research as ResearchStatusFilter) : null;
+  if (f.permission || derived) {
     const all = await prisma.submission.findMany({ where, include, orderBy: { submittedAt: "desc" } });
-    const filtered = all.filter((s) => currentPermissions(s.permissions).WEBSITE_DATA_USE === f.permission);
-    return {
-      rows: filtered.slice((page - 1) * SUBMISSION_PAGE_SIZE, page * SUBMISSION_PAGE_SIZE),
-      total: filtered.length,
-      page,
-    };
+    const evals = derived ? await evaluateRows(all) : null;
+    const filtered = all.filter(
+      (s) =>
+        (!f.permission || currentPermissions(s.permissions).WEBSITE_DATA_USE === f.permission) &&
+        (!derived || matchesResearchFilter(evals!.get(s.id)!, derived)),
+    );
+    const rows = filtered.slice((page - 1) * SUBMISSION_PAGE_SIZE, page * SUBMISSION_PAGE_SIZE);
+    return { rows, total: filtered.length, page, eligibility: evals ?? (await evaluateRows(rows)) };
   }
   const [total, rows] = await Promise.all([
     prisma.submission.count({ where }),
@@ -114,7 +121,7 @@ export async function listSubmissions(f: SubmissionListFilters) {
       take: SUBMISSION_PAGE_SIZE,
     }),
   ]);
-  return { rows, total, page };
+  return { rows, total, page, eligibility: await evaluateRows(rows) };
 }
 
 export async function getSubmissionDetail(id: string) {

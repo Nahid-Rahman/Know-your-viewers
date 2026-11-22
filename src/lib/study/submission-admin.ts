@@ -3,28 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { decryptContact } from "@/lib/crypto";
 import { audit, getAccessibleSubmission, type Actor } from "./access";
 import { StudyRuleError } from "./sessions";
+import { evaluateResearchEligibility } from "./eligibility";
 
-export const PERMISSION_TYPES = ["INTERVIEW_PROCEED", "WEBSITE_DATA_USE", "INTERVIEW_ANSWERS_USE"] as const;
-export type PermissionTypeValue = (typeof PERMISSION_TYPES)[number];
-export type PermissionStatusValue = "PENDING" | "GRANTED" | "DECLINED" | "WITHDRAWN";
-
-/** Latest status per permission type; types never recorded are PENDING. */
-export function currentPermissions(
-  rows: { type: PermissionTypeValue; status: PermissionStatusValue; recordedAt: Date }[],
-): Record<PermissionTypeValue, PermissionStatusValue> {
-  const out = { INTERVIEW_PROCEED: "PENDING", WEBSITE_DATA_USE: "PENDING", INTERVIEW_ANSWERS_USE: "PENDING" } as Record<
-    PermissionTypeValue,
-    PermissionStatusValue
-  >;
-  const latest = new Map<string, Date>();
-  for (const r of rows) {
-    if (!latest.has(r.type) || latest.get(r.type)! <= r.recordedAt) {
-      latest.set(r.type, r.recordedAt);
-      out[r.type] = r.status;
-    }
-  }
-  return out;
-}
+export { PERMISSION_TYPES, currentPermissions, type PermissionStatusValue, type PermissionTypeValue } from "./permissions";
+import { PERMISSION_TYPES, currentPermissions, type PermissionStatusValue, type PermissionTypeValue } from "./permissions";
 
 /**
  * Appends one permission decision for ONE type. Never copies a single answer
@@ -73,9 +55,20 @@ export async function recordPermission(
   });
 }
 
+/**
+ * Owner decision: people who selected "Below 18" are never contacted — not for
+ * research follow-up, interviews, or rewards. Enforced on the server for every
+ * contact path (reveal, follow-up, attempts, interviews, contact exports).
+ */
+export const UNDER18_CONTACT_BLOCKED = "This entrant selected “Below 18”. Under-18 entrants are not contacted, so contact details and follow-up are unavailable.";
+export function assertContactAllowed(s: { ageGroup: string }) {
+  if (s.ageGroup === "BELOW_18") throw new StudyRuleError(UNDER18_CONTACT_BLOCKED);
+}
+
 /** Deliberate, audited reveal of contact values. Never used for list rendering. */
 export async function revealSubmissionContact(actor: Actor, submissionId: string, purpose: string) {
   const submission = await getAccessibleSubmission(actor, submissionId, "contact");
+  assertContactAllowed(submission);
   if (!purpose.trim()) throw new StudyRuleError("State why the contact details are needed.");
   const contact = await prisma.submissionContact.findUnique({ where: { submissionId } });
   if (!contact) throw new StudyRuleError("No contact details on file.");
@@ -109,31 +102,75 @@ async function assertNoFinalizedDraw(experimentId: string, isTest: boolean) {
   if (draw) throw new StudyRuleError("A draw has been finalized; its eligible population can't change. Void it first (with a reason) if a correction is required.");
 }
 
-export async function setResearchExclusion(
+export const EXCLUSION_CATEGORIES = ["INCOMPLETE", "TECHNICAL_ERROR", "TEST_ENTRY", "INVALID_SUBMISSION", "PARTICIPANT_WITHDREW", "OTHER"] as const;
+export type ExclusionInput = { excluded: boolean; reason?: (typeof EXCLUSION_CATEGORIES)[number]; note?: string };
+
+/**
+ * Manual research exclusion (or its reversal). It can only ADD an exclusion:
+ * reversing it never makes an entry eligible past a hard rule (under-18,
+ * duplicate, TEST, missing permission, purged) — those come from recorded
+ * facts and are re-derived by the evaluator. Every change is audited with the
+ * prior and new classification, without contact values or the free-text note.
+ */
+async function applyResearchExclusion(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
   actor: Actor,
   submissionId: string,
-  input: { excluded: boolean; reason?: "INCOMPLETE" | "TECHNICAL_ERROR" | "TEST_ENTRY" | "INVALID_SUBMISSION" | "PARTICIPANT_WITHDREW" | "OTHER"; note?: string },
+  input: ExclusionInput,
+  bulk: boolean,
 ) {
-  const s = await getAccessibleSubmission(actor, submissionId, "write");
-  if (input.excluded && !input.reason) throw new StudyRuleError("Choose an exclusion reason.");
-  await prisma.$transaction(async (tx) => {
-    await tx.submission.update({
-      where: { id: submissionId },
-      data: {
-        researchExcluded: input.excluded,
-        researchExclusionReason: input.excluded ? input.reason : null,
-        researchExclusionNote: input.excluded ? input.note?.trim().slice(0, 500) || null : null,
-      },
-    });
-    await audit(tx, {
-      actorId: actor.id,
-      action: input.excluded ? "RESEARCH_EXCLUDED" : "RESEARCH_EXCLUSION_REMOVED",
-      entityType: "Submission",
-      entityId: submissionId,
-      experimentId: s.experimentId,
-      detail: { reason: input.reason ?? null, previous: s.researchExcluded },
-    });
+  const s = await tx.submission.findUniqueOrThrow({
+    where: { id: submissionId },
+    include: { permissions: { select: { type: true, status: true, recordedAt: true } } },
   });
+  const before = evaluateResearchEligibility(s);
+  const note = input.excluded ? input.note?.trim().slice(0, 500) || null : null;
+  await tx.submission.update({
+    where: { id: submissionId },
+    data: {
+      researchExcluded: input.excluded,
+      researchExclusionReason: input.excluded ? input.reason : null,
+      researchExclusionNote: note,
+    },
+  });
+  const after = evaluateResearchEligibility({ ...s, researchExcluded: input.excluded });
+  await audit(tx, {
+    actorId: actor.id,
+    action: input.excluded ? "RESEARCH_EXCLUDED" : "RESEARCH_EXCLUSION_REMOVED",
+    entityType: "Submission",
+    entityId: submissionId,
+    experimentId: s.experimentId,
+    detail: {
+      responseCode: s.responseCode,
+      bulk,
+      reason: input.reason ?? null,
+      hasNote: Boolean(note),
+      previous: { manual: s.researchExcluded, manualReason: s.researchExclusionReason, status: before.status, reasons: before.reasons },
+      next: { manual: input.excluded, manualReason: input.excluded ? input.reason : null, status: after.status, reasons: after.reasons },
+    },
+  });
+}
+
+export async function setResearchExclusion(actor: Actor, submissionId: string, input: ExclusionInput) {
+  await getAccessibleSubmission(actor, submissionId, "write");
+  if (input.excluded && !input.reason) throw new StudyRuleError("Choose an exclusion reason.");
+  if (input.reason && !EXCLUSION_CATEGORIES.includes(input.reason)) throw new StudyRuleError("Unknown exclusion reason.");
+  await prisma.$transaction((tx) => applyResearchExclusion(tx, actor, submissionId, input, false));
+}
+
+/** Same rule for many entries at once; all-or-nothing, each audited separately. */
+export async function bulkSetResearchExclusion(actor: Actor, submissionIds: string[], input: ExclusionInput) {
+  const ids = [...new Set(submissionIds.filter((x) => typeof x === "string" && /^[0-9a-f-]{36}$/.test(x)))];
+  if (!ids.length) throw new StudyRuleError("Select at least one submission.");
+  if (ids.length > 200) throw new StudyRuleError("Select at most 200 submissions at a time.");
+  if (input.excluded && !input.reason) throw new StudyRuleError("Choose an exclusion reason.");
+  if (input.reason && !EXCLUSION_CATEGORIES.includes(input.reason)) throw new StudyRuleError("Unknown exclusion reason.");
+  // Authorise every row before changing any.
+  for (const id of ids) await getAccessibleSubmission(actor, id, "write");
+  await prisma.$transaction(async (tx) => {
+    for (const id of ids) await applyResearchExclusion(tx, actor, id, input, true);
+  });
+  return { updated: ids.length };
 }
 
 export async function setDrawExclusion(actor: Actor, submissionId: string, input: { excluded: boolean; note: string }) {

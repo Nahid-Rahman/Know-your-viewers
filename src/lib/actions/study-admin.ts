@@ -19,12 +19,15 @@ import {
 } from "@/lib/study/sessions";
 import { runDraw, updatePayout, voidDraw } from "@/lib/study/draw";
 import {
+  assertContactAllowed,
+  bulkSetResearchExclusion,
   promoteDuplicate,
   purgeResearchData,
   recordPermission,
   revealSubmissionContact,
   setDrawExclusion,
   setResearchExclusion,
+  type ExclusionInput,
   type PermissionStatusValue,
   type PermissionTypeValue,
 } from "@/lib/study/submission-admin";
@@ -340,11 +343,12 @@ export async function revealContactAction(submissionId: string, purpose: string)
   return run((a) => revealSubmissionContact(a, submissionId, purpose));
 }
 
-export async function setResearchExclusionAction(
-  submissionId: string,
-  input: { excluded: boolean; reason?: "INCOMPLETE" | "TECHNICAL_ERROR" | "TEST_ENTRY" | "INVALID_SUBMISSION" | "PARTICIPANT_WITHDREW" | "OTHER"; note?: string },
-) {
+export async function setResearchExclusionAction(submissionId: string, input: ExclusionInput) {
   return run((a) => setResearchExclusion(a, submissionId, input), [ADMIN]);
+}
+
+export async function bulkResearchExclusionAction(submissionIds: string[], input: ExclusionInput) {
+  return run((a) => bulkSetResearchExclusion(a, Array.isArray(submissionIds) ? submissionIds : [], input), [ADMIN]);
 }
 
 export async function setDrawExclusionAction(submissionId: string, excluded: boolean, note: string) {
@@ -369,6 +373,7 @@ const followUpSchema = z.object({
 export async function saveFollowUpAction(submissionId: string, input: z.input<typeof followUpSchema>) {
   return run(async (a) => {
     const s = await getAccessibleSubmission(a, submissionId, "write");
+    assertContactAllowed(s);
     const v = followUpSchema.parse(input);
     const data = {
       status: v.status,
@@ -390,6 +395,7 @@ const attemptSchema = z.object({
 export async function logAttemptAction(submissionId: string, input: z.input<typeof attemptSchema>) {
   return run(async (a) => {
     const s = await getAccessibleSubmission(a, submissionId, "write");
+    assertContactAllowed(s);
     const v = attemptSchema.parse(input);
     await prisma.$transaction(async (tx) => {
       await tx.submissionContactAttempt.create({ data: { submissionId, outcome: v.outcome, method: v.method, note: v.note || null, researcherId: a.id } });
@@ -419,6 +425,7 @@ const interviewSchema = z.object({
 export async function saveInterviewAction(submissionId: string, interviewId: string | null, input: z.input<typeof interviewSchema>) {
   return run(async (a) => {
     const s = await getAccessibleSubmission(a, submissionId, "write");
+    assertContactAllowed(s);
     const v = interviewSchema.parse(input);
     const duration = v.durationMinutes === undefined || v.durationMinutes === "" ? null : Number(v.durationMinutes);
     if (duration !== null && (!Number.isInteger(duration) || duration < 0)) throw new StudyRuleError("Duration must be whole minutes.");

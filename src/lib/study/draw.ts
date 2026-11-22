@@ -34,18 +34,20 @@ async function policies(experimentId: string): Promise<PolicyRecord[]> {
 
 /**
  * Canonical entries eligible for the draw. Never includes duplicates, test
- * entries in a live draw (or vice versa), or entries an admin excluded from
- * the draw. Research permission, interview participation and optional fields
- * play no part here.
+ * entries in a live draw (or vice versa), entries an admin excluded from the
+ * draw, or — by the project owner's decision — anyone who selected "Below 18"
+ * (live AND test draws, regardless of the UNDER18_CONTACT_AND_REWARD record).
+ * Research permission, interview participation and optional fields play no
+ * part here, and every eligible entry has exactly one equal chance.
  */
-export async function drawEligibleEntries(experimentId: string, isTest: boolean, under18Eligible: boolean) {
+export async function drawEligibleEntries(experimentId: string, isTest: boolean) {
   return prisma.submission.findMany({
     where: {
       experimentId,
       isTest,
       status: "CANONICAL",
       drawExcluded: false,
-      ...(under18Eligible ? {} : { ageGroup: { not: "BELOW_18" } }),
+      ageGroup: { not: "BELOW_18" },
     },
     select: { id: true, responseCode: true, submittedAt: true },
     orderBy: [{ submittedAt: "asc" }, { id: "asc" }],
@@ -56,8 +58,15 @@ export async function drawPreflight(actor: Actor, experimentId: string, isTest: 
   await assertExperimentAccess(actor, experimentId, "read");
   const records = await policies(experimentId);
   const problems: string[] = [];
+  const warnings: string[] = [];
   let winnerCount: number | null = approvedWinnerCount(records);
-  let under18 = approvedUnder18RewardEligible(records);
+  // Owner decision: under-18 entrants are never selected. A policy record that
+  // says otherwise is reported, not followed.
+  if (approvedUnder18RewardEligible(records) === true) {
+    warnings.push(
+      "The recorded under-18 decision says under-18 entrants are reward-eligible, but the draw excludes them (project owner decision). Update the decision record and the public prize wording so they match.",
+    );
+  }
 
   if (!isTest) {
     for (const k of blockingPoliciesForLiveDraw(records)) problems.push(`Pending decision: ${POLICY_DEFINITIONS[k].title}.`);
@@ -65,7 +74,6 @@ export async function drawPreflight(actor: Actor, experimentId: string, isTest: 
     // Test draws use synthetic entries only; pending policies don't block them,
     // but the winner count must still be typed in explicitly.
     winnerCount = null;
-    if (under18 === null) under18 = true;
   }
 
   const sessions = await prisma.streamSession.findMany({
@@ -78,8 +86,8 @@ export async function drawPreflight(actor: Actor, experimentId: string, isTest: 
   const existing = await prisma.rewardDraw.findFirst({ where: { experimentId, isTest, status: "FINALIZED" } });
   if (existing) problems.push("A finalized draw already exists. Void it with a recorded reason before drawing again.");
 
-  const eligible = await drawEligibleEntries(experimentId, isTest, under18 ?? false);
-  return { problems, winnerCount, under18Eligible: under18, eligibleCount: eligible.length, existingDrawId: existing?.id ?? null };
+  const eligible = await drawEligibleEntries(experimentId, isTest);
+  return { problems, warnings, winnerCount, under18Eligible: false as const, eligibleCount: eligible.length, existingDrawId: existing?.id ?? null };
 }
 
 export async function runDraw(actor: Actor, experimentId: string, isTest: boolean, requestedForTest?: number) {
@@ -91,7 +99,7 @@ export async function runDraw(actor: Actor, experimentId: string, isTest: boolea
   if (!requested || !Number.isInteger(requested) || requested < 1) {
     throw new StudyRuleError(isTest ? "Enter how many winners to draw for this test." : "The winner count has not been decided.");
   }
-  const eligible = await drawEligibleEntries(experimentId, isTest, pre.under18Eligible ?? false);
+  const eligible = await drawEligibleEntries(experimentId, isTest);
   if (eligible.length < requested) {
     throw new StudyRuleError(
       `Only ${eligible.length} eligible entries for ${requested} winners. The count is not reduced automatically — resolve this with the research team first.`,
@@ -109,7 +117,7 @@ export async function runDraw(actor: Actor, experimentId: string, isTest: boolea
           requestedWinnerCount: requested,
           eligibleCount: eligible.length,
           eligibleSnapshot: eligible.map((e) => ({ submissionId: e.id, responseCode: e.responseCode })) as Prisma.InputJsonValue,
-          method: `${DRAW_METHOD} Under-18 entries ${pre.under18Eligible ? "included" : "excluded"}${isTest ? " (test draw)" : ""}.`,
+          method: `${DRAW_METHOD} Under-18 entries excluded${isTest ? " (test draw)" : ""}.`,
           executedById: actor.id,
           winners: { create: chosen.map((i, rank) => ({ submissionId: eligible[i].id, rank: rank + 1 })) },
         },

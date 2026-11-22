@@ -223,10 +223,11 @@ export function InterviewForm({ submissionId }: { submissionId: string }) {
   );
 }
 
-export function ResearchExclusionForm({ submissionId, excluded }: { submissionId: string; excluded: boolean }) {
+export function ResearchExclusionForm({ submissionId, excluded, detected = [] }: { submissionId: string; excluded: boolean; detected?: string[] }) {
   const { pending, run } = useRun();
   const [reason, setReason] = useState("INVALID_SUBMISSION");
-  const [note, setNote] = useState("");
+  // Pre-filled with what the evaluator detected; the researcher can confirm, edit or add.
+  const [note, setNote] = useState(detected.length ? `Detected: ${detected.join("; ")}`.slice(0, 500) : "");
   if (excluded) {
     return (
       <Button size="sm" variant="outline" disabled={pending} onClick={() => run(() => setResearchExclusionAction(submissionId, { excluded: false }), "Exclusion removed.")}>
@@ -241,7 +242,7 @@ export function ResearchExclusionForm({ submissionId, excluded }: { submissionId
           <option key={r} value={r}>{r.replace(/_/g, " ").toLowerCase()}</option>
         ))}
       </select>
-      <Input aria-label="Note" placeholder="Note" className="w-56" value={note} onChange={(e) => setNote(e.target.value)} />
+      <Input aria-label="Note" placeholder="Note / custom reason" className="w-72" value={note} onChange={(e) => setNote(e.target.value)} />
       <Button
         size="sm"
         variant="outline"
