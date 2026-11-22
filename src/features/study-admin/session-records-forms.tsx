@@ -124,7 +124,7 @@ export function PlatformMetricForm({ sessionId, defaultPlatform }: { sessionId: 
         <p className="mt-2 text-xs text-muted-foreground">
           Header row with any of: platform, platformStreamId, source, measuredAt, windowStart, windowEnd, durationMinutes, views,
           avgConcurrentViewers, peakConcurrentViewers, watchTimeMinutes, avgViewDurationSeconds, likes, comments, shares, newFollowers, notes.
-          Times as YYYY-MM-DDTHH:mm (Dhaka). No commas inside values.
+          Times as YYYY-MM-DDTHH:mm (Dhaka). Put values containing commas or line breaks in double quotes. Blank cells stay blank (unknown), never 0. If any row has a problem, nothing is imported.
         </p>
         <Textarea className="mt-2 font-mono text-xs" rows={4} value={csv} onChange={(e) => setCsv(e.target.value)} />
         <Button
@@ -135,7 +135,7 @@ export function PlatformMetricForm({ sessionId, defaultPlatform }: { sessionId: 
           onClick={() =>
             start(async () => {
               const r = await importPlatformMetricsAction(sessionId, csv);
-              if ("error" in r) return void toast.error(r.error);
+              if ("error" in r) return void toast.error(r.error, { duration: 15000 });
               toast.success(`Imported ${r.data.rows} row(s).`);
               setCsv("");
               router.refresh();

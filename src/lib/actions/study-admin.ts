@@ -36,6 +36,7 @@ import { POLICY_KEYS, type PolicyKey } from "@/lib/study/policy";
 import { parseStudyLocal } from "@/lib/study/time";
 import { storeImage } from "@/lib/study/media";
 import { openSupportRequest } from "@/lib/study/support-admin";
+import { metricData, metricSchema, parseMetricsCsv, type PlatformMetricInput } from "@/lib/study/metrics-import";
 
 type Result<T = undefined> = { ok: true; data: T } | { error: string };
 
@@ -140,99 +141,34 @@ export async function addAnnotationAction(sessionId: string, input: z.input<type
   }, [ADMIN]);
 }
 
-const optInt = z
-  .union([z.string(), z.number()])
-  .optional()
-  .transform((v, ctx) => {
-    if (v === undefined || v === "") return null; // missing stays missing — never 0
-    const n = typeof v === "number" ? v : Number(String(v).replace(/,/g, ""));
-    if (!Number.isInteger(n) || n < 0) {
-      ctx.addIssue({ code: "custom", message: "Metrics must be whole numbers (or left blank)." });
-      return z.NEVER;
-    }
-    return n;
-  });
-
-const metricSchema = z.object({
-  platform: z.string().trim().min(1, "Platform is required.").max(40),
-  platformStreamId: z.string().trim().max(120).optional(),
-  durationMinutes: optInt,
-  views: optInt,
-  avgConcurrentViewers: optInt,
-  peakConcurrentViewers: optInt,
-  watchTimeMinutes: optInt,
-  avgViewDurationSeconds: optInt,
-  likes: optInt,
-  comments: optInt,
-  shares: optInt,
-  newFollowers: optInt,
-  source: z.string().trim().min(1, "Say where the numbers came from.").max(120),
-  measuredAt: z.string().min(1, "Enter when the numbers were read."),
-  windowStart: z.string().optional(),
-  windowEnd: z.string().optional(),
-  notes: z.string().trim().max(1000).optional(),
-});
-
-export type PlatformMetricInput = z.input<typeof metricSchema>;
+export type { PlatformMetricInput } from "@/lib/study/metrics-import";
 
 export async function savePlatformMetricAction(sessionId: string, input: PlatformMetricInput) {
   return run(async (a) => {
     const session = await getAccessibleSession(a, sessionId, "write");
     const v = metricSchema.parse(input);
-    await prisma.platformMetric.create({
-      data: {
-        ...v,
-        platformStreamId: v.platformStreamId || null,
-        notes: v.notes || null,
-        measuredAt: parseStudyLocal(v.measuredAt)!,
-        windowStart: parseStudyLocal(v.windowStart),
-        windowEnd: parseStudyLocal(v.windowEnd),
-        streamSessionId: sessionId,
-        recordedById: a.id,
-      },
-    });
+    await prisma.platformMetric.create({ data: { ...metricData(v), streamSessionId: sessionId, recordedById: a.id } });
     await audit(prisma, { actorId: a.id, action: "PLATFORM_METRIC_RECORDED", entityType: "StreamSession", entityId: sessionId, experimentId: session.experimentId });
   }, [ADMIN]);
 }
 
 /**
- * CSV import: header row with any of the PlatformMetricInput field names
- * (platform, source and measuredAt required; measuredAt as YYYY-MM-DDTHH:mm Dhaka).
+ * CSV import (RFC 4180: quoted commas, line breaks and "" escapes; CRLF; BOM).
+ * Header row with PlatformMetricInput field names (platform, source and
+ * measuredAt required; times as YYYY-MM-DDTHH:mm Dhaka). The whole file is
+ * validated first; nothing is saved unless every row is valid, and the rows
+ * are written in one transaction.
  */
 export async function importPlatformMetricsAction(sessionId: string, csvText: string) {
   return run(async (a) => {
     const session = await getAccessibleSession(a, sessionId, "write");
-    if (csvText.length > 100_000) throw new StudyRuleError("File too large.");
-    const lines = csvText.split(/\r?\n/).filter((l) => l.trim());
-    if (lines.length < 2) throw new StudyRuleError("Expected a header row and at least one data row.");
-    const headers = lines[0].split(",").map((h) => h.trim());
-    const allowed = new Set(Object.keys(metricSchema.shape));
-    for (const h of headers) if (!allowed.has(h)) throw new StudyRuleError(`Unknown column "${h}".`);
-    const rows = lines.slice(1).map((line, i) => {
-      const cells = line.split(",");
-      const obj = Object.fromEntries(headers.map((h, j) => [h, (cells[j] ?? "").trim()]));
-      const parsed = metricSchema.safeParse(obj);
-      if (!parsed.success) throw new StudyRuleError(`Row ${i + 2}: ${parsed.error.issues[0]?.message}`);
-      return parsed.data;
-    });
+    const parsed = parseMetricsCsv(typeof csvText === "string" ? csvText : "");
+    if (!parsed.ok) throw new StudyRuleError(`Nothing was imported. ${parsed.errors.join(" ")}`);
     await prisma.$transaction(
-      rows.map((v) =>
-        prisma.platformMetric.create({
-          data: {
-            ...v,
-            platformStreamId: v.platformStreamId || null,
-            notes: v.notes || null,
-            measuredAt: parseStudyLocal(v.measuredAt)!,
-            windowStart: parseStudyLocal(v.windowStart),
-            windowEnd: parseStudyLocal(v.windowEnd),
-            streamSessionId: sessionId,
-            recordedById: a.id,
-          },
-        }),
-      ),
+      parsed.rows.map((v) => prisma.platformMetric.create({ data: { ...metricData(v), streamSessionId: sessionId, recordedById: a.id } })),
     );
-    await audit(prisma, { actorId: a.id, action: "PLATFORM_METRICS_IMPORTED", entityType: "StreamSession", entityId: sessionId, experimentId: session.experimentId, detail: { rows: rows.length } });
-    return { rows: rows.length };
+    await audit(prisma, { actorId: a.id, action: "PLATFORM_METRICS_IMPORTED", entityType: "StreamSession", entityId: sessionId, experimentId: session.experimentId, detail: { rows: parsed.rows.length } });
+    return { rows: parsed.rows.length };
   }, [ADMIN]);
 }
 
