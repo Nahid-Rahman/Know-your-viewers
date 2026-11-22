@@ -69,9 +69,8 @@ export function researchEligibleWhere(experimentId: string): Prisma.SubmissionWh
   };
 }
 
-export async function researchEligibleSubmissions(experimentId: string, opts: { includeTest?: boolean } = {}) {
+export async function researchEligibleSubmissions(experimentId: string) {
   const where = researchEligibleWhere(experimentId);
-  if (opts.includeTest) delete where.isTest;
   const rows = await prisma.submission.findMany({
     where,
     include: {
@@ -83,17 +82,31 @@ export async function researchEligibleSubmissions(experimentId: string, opts: { 
     },
     orderBy: { submittedAt: "asc" },
   });
-  // The shared evaluator decides. Pending, declined, withdrawn and unreachable
-  // (still pending) website-data use are all left out. With includeTest, the
-  // TEST reason alone does not exclude.
-  return rows.filter((r) => {
-    const e = evaluateResearchEligibility(r);
-    return e.reasons.every((reason) => includeTestReason(reason, opts.includeTest));
-  });
+  // The shared evaluator decides, exactly as in the list, detail and stats:
+  // pending, declined, withdrawn, TEST and every other reason leave a record
+  // out. TEST records are never research data, whatever the export toggle.
+  return rows.filter((r) => evaluateResearchEligibility(r).status === "ELIGIBLE");
 }
 
-function includeTestReason(reason: string, includeTest?: boolean) {
-  return includeTest === true && reason === "TEST_CAMPAIGN";
+const r1 = (x: number | null) => (x === null ? "" : Math.round(x * 10) / 10);
+
+/** Aggregate rows for one durationGroups result; `prefix` names a phase subset (e.g. "live_"). */
+function durationGroupRows(base: string[], dg: Awaited<ReturnType<typeof durationGroups>>, prefix: string): (string | number)[][] {
+  const scope = prefix ? `visits that started ${dg.phase === "LIVE" ? "during" : "after"} the stream; ` : "";
+  const out: (string | number)[][] = [];
+  out.push([...base, `${prefix}duration_comparable_visits`, dg.comparableVisits, `${scope}visits measured on all public pages (v2); denominator for group shares`]);
+  out.push([...base, `${prefix}duration_legacy_visits`, dg.legacyVisits, `${scope}homepage-only visits before 2026-11-22; not in groups`]);
+  for (const g of dg.groups) {
+    const k = `${prefix}group_${g.group.toLowerCase()}`;
+    out.push([...base, `${k}_visits`, g.visits, `${scope}distinct visits in this group`]);
+    out.push([...base, `${k}_share`, r1(g.share === null ? null : g.share * 100), `% of ${prefix}duration_comparable_visits`]);
+    out.push([...base, `${k}_visible_mean_s`, r1(g.visible.mean), "estimated visible time, all public pages"]);
+    out.push([...base, `${k}_visible_median_s`, r1(g.visible.median), "estimated visible time, all public pages"]);
+    out.push([...base, `${k}_visible_p90_s`, r1(g.visible.p90), "estimated visible time, all public pages"]);
+    out.push([...base, `${k}_home_visible_median_s`, r1(g.homeVisible.median), "estimated visible time, homepage only"]);
+    out.push([...base, `${k}_elapsed_median_s`, r1(g.elapsed.median), "elapsed visit duration (not attention)"]);
+  }
+  return out;
 }
 
 export async function buildStudyExport(actor: Actor, type: StudyExportType, experimentId: string, includeTest = false) {
@@ -105,7 +118,7 @@ export async function buildStudyExport(actor: Actor, type: StudyExportType, expe
   const testFilter = includeTest ? {} : { isTest: false };
 
   if (type === "research-submissions") {
-    const subs = await researchEligibleSubmissions(experimentId, { includeTest });
+    const subs = await researchEligibleSubmissions(experimentId);
     headers = [
       "study_id", "session_id", "streamer", "session_title", "attribution", "phase", "submitted_at", "age_group",
       "email_provided", "ign_provided", "social_provided", "discord_provided", "facebook_provided", "spin_result", "spin_mechanism",
@@ -119,7 +132,7 @@ export async function buildStudyExport(actor: Actor, type: StudyExportType, expe
       s.followUp?.status ?? "NOT_CONTACTED", s.isTest,
     ]);
   } else if (type === "research-interviews") {
-    const subs = await researchEligibleSubmissions(experimentId, { includeTest });
+    const subs = await researchEligibleSubmissions(experimentId);
     const allowed = subs.filter((s) => currentPermissions(s.permissions).INTERVIEW_ANSWERS_USE === "GRANTED");
     const interviews = await prisma.submissionInterview.findMany({
       where: { submissionId: { in: allowed.map((s) => s.id) }, status: "COMPLETED" },
@@ -173,19 +186,13 @@ export async function buildStudyExport(actor: Actor, type: StudyExportType, expe
         rows.push([...base, `${st.type.toLowerCase()}_visits`, st.visits, "distinct visits"]);
       }
       for (const r of att.validationReasons) rows.push([...base, `validation_reason_${r.reason.toLowerCase()}`, r.attempts, "failed attempts with this reason; reasons overlap"]);
-      rows.push([...base, "duration_comparable_visits", dg.comparableVisits, "visits measured on all public pages (v2); denominator for group shares"]);
-      rows.push([...base, "duration_legacy_visits", dg.legacyVisits, "homepage-only visits before 2026-11-22; not in groups"]);
-      const r1 = (x: number | null) => (x === null ? "" : Math.round(x * 10) / 10);
-      for (const g of dg.groups) {
-        const k = `group_${g.group.toLowerCase()}`;
-        rows.push([...base, `${k}_visits`, g.visits, "distinct visits in this group"]);
-        rows.push([...base, `${k}_share`, r1(g.share === null ? null : g.share * 100), "% of duration_comparable_visits"]);
-        rows.push([...base, `${k}_visible_mean_s`, r1(g.visible.mean), "estimated visible time, all public pages"]);
-        rows.push([...base, `${k}_visible_median_s`, r1(g.visible.median), "estimated visible time, all public pages"]);
-        rows.push([...base, `${k}_visible_p90_s`, r1(g.visible.p90), "estimated visible time, all public pages"]);
-        rows.push([...base, `${k}_home_visible_median_s`, r1(g.homeVisible.median), "estimated visible time, homepage only"]);
-        rows.push([...base, `${k}_elapsed_median_s`, r1(g.elapsed.median), "elapsed visit duration (not attention)"]);
-      }
+      rows.push(...durationGroupRows(base, dg, ""));
+    }
+    // Campaign totals across the same sessions, all visits and by the stream phase the visit started in.
+    const ids = sessions.map((s) => s.id);
+    rows.push(...durationGroupRows(all, await durationGroups(ids), ""));
+    for (const phase of ["LIVE", "POST_STREAM"] as const) {
+      rows.push(...durationGroupRows(all, await durationGroups(ids, { phase }), `${phase.toLowerCase()}_`));
     }
   } else if (type === "duplicate-statistics") {
     const dups = await prisma.submission.findMany({

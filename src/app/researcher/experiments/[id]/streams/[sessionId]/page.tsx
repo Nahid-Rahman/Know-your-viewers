@@ -4,7 +4,7 @@ import { StatusBadge } from "@/components/common/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireExperimentPage } from "@/lib/study/researcher";
 import { getPolicies, getSessionDetail } from "@/lib/study/admin-queries";
-import { attemptOutcomes, durationGroups, durationSummary, phaseSplit, sessionFunnel, submissionSummary, trafficSeries, BUCKET_OPTIONS } from "@/lib/study/stats";
+import { attemptOutcomes, durationGroups, parseDurationPhase, durationSummary, phaseSplit, sessionFunnel, submissionSummary, trafficSeries, BUCKET_OPTIONS } from "@/lib/study/stats";
 import { EngagementGroupsCard } from "@/features/study-admin/engagement-groups-card";
 import { blockingPoliciesForLive, POLICY_DEFINITIONS } from "@/lib/study/policy";
 import { entryState } from "@/lib/study/session-state";
@@ -65,7 +65,7 @@ export default async function SessionDetailPage({ params, searchParams }: PagePr
         trafficSeries(sessionId, bucket),
         // A TEST session's records are all TEST, so include them here.
         eligibilityStats({ experimentId: id, streamSessionId: sessionId, includeTest: true }),
-        durationGroups([sessionId]),
+        durationGroups([sessionId], { phase: parseDurationPhase(sp.phase) }),
         attemptOutcomes(sessionId),
       ])
     : [null, null, null, null, null, null, null, null];
@@ -294,7 +294,7 @@ export default async function SessionDetailPage({ params, searchParams }: PagePr
         </Card>
       )}
 
-      {isStudy && groups && attempts && <EngagementGroupsCard groups={groups} attempts={attempts} />}
+      {isStudy && groups && attempts && <EngagementGroupsCard groups={groups} attempts={attempts} scopeLabel="this session" query={sp.bucket ? { bucket: String(sp.bucket) } : {}} />}
 
       {isStudy && elStats && <EligibilityStatsCard stats={elStats} scopeLabel="this session" />}
 

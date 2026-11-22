@@ -28,10 +28,17 @@ async function sameBrowserOtherPhones(rows: Pick<EvalRow, "id" | "experimentId" 
   const out = new Map<string, number>();
   if (!rows.length) return out;
   const pairs = [...new Map(rows.map((r) => [`${r.experimentId}|${r.visitorId}`, { experimentId: r.experimentId, visitorId: r.visitorId }])).values()];
-  const peers = await prisma.submission.findMany({
-    where: { status: "CANONICAL", OR: pairs },
-    select: { experimentId: true, visitorId: true, phoneHash: true },
-  });
+  // Chunked so a very large selection stays under Postgres's bind-parameter limit.
+  const CHUNK = 1000;
+  const peers: { experimentId: string; visitorId: string; phoneHash: string }[] = [];
+  for (let i = 0; i < pairs.length; i += CHUNK) {
+    peers.push(
+      ...(await prisma.submission.findMany({
+        where: { status: "CANONICAL", OR: pairs.slice(i, i + CHUNK) },
+        select: { experimentId: true, visitorId: true, phoneHash: true },
+      })),
+    );
+  }
   const phonesByPair = new Map<string, Set<string>>();
   for (const p of peers) {
     const k = `${p.experimentId}|${p.visitorId}`;

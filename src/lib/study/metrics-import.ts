@@ -10,7 +10,13 @@ const optInt = z
   .optional()
   .transform((v, ctx) => {
     if (v === undefined || (typeof v === "string" && v.trim() === "")) return null; // missing stays missing, never 0
-    const n = typeof v === "number" ? v : Number(String(v).trim().replace(/,/g, ""));
+    const text = typeof v === "number" ? null : String(v).trim();
+    // Plain digits only (thousands commas allowed): rejects 0x10, 1e3, 0b11, +5, 1.0.
+    if (text !== null && !/^\d{1,3}(,\d{3})*$|^\d+$/.test(text)) {
+      ctx.addIssue({ code: "custom", message: "Metrics must be whole numbers (or left blank)." });
+      return z.NEVER;
+    }
+    const n = typeof v === "number" ? v : Number(text!.replace(/,/g, ""));
     if (!Number.isInteger(n) || n < 0) {
       ctx.addIssue({ code: "custom", message: "Metrics must be whole numbers (or left blank)." });
       return z.NEVER;

@@ -63,6 +63,9 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const lastStart = useRef<StartOpts | null>(null);
   const inFlight = useRef(false);
+  // Set when the server says the page shows an outdated configuration.
+  const needsReload = useRef(false);
+  const reloadTimer = useRef<number | undefined>(undefined);
   // Route whose time is currently being credited (null = untracked page).
   const creditedRoute = useRef<PublicRouteKey | null>(route);
   const loggedRoute = useRef<PublicRouteKey | null>(null);
@@ -72,6 +75,8 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
       if (inFlight.current) return;
       inFlight.current = true;
       lastStart.current = opts;
+      needsReload.current = false;
+      window.clearTimeout(reloadTimer.current);
       setStatus("starting");
       setError(null);
       startVisit({ ref: opts.refCode, referrer: document.referrer || null, renderedConfigId: opts.renderedConfigId })
@@ -82,7 +87,16 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
             return;
           }
           if (r.configChanged) {
+            // Re-render with the current configuration; the homepage then
+            // starts again with the new config id (useStudyVisit). If nothing
+            // changes, don't leave the button stuck: offer a reload.
+            needsReload.current = true;
             router.refresh();
+            reloadTimer.current = window.setTimeout(() => {
+              if (!needsReload.current) return;
+              setStatus("error");
+              setError("This page was updated. Press Try again to reload it.");
+            }, 8000);
             return;
           }
           setVisitId(r.visitId);
@@ -107,8 +121,14 @@ export function VisitProvider({ children }: { children: React.ReactNode }) {
   );
 
   const retry = useCallback(() => {
+    if (needsReload.current) {
+      window.location.reload();
+      return;
+    }
     if (lastStart.current) start(lastStart.current);
   }, [start]);
+
+  useEffect(() => () => window.clearTimeout(reloadTimer.current), []);
 
   // Non-home public pages: continue an existing live visit, never create one.
   useEffect(() => {

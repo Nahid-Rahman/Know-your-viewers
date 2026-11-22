@@ -56,6 +56,10 @@ describe("invalid submit attempts", () => {
     expect(codesFor(ok)).toEqual([]);
   });
 
+  it("reports format errors together with missing required fields", () => {
+    expect(codesFor({ ...ok, name: "", discord: "a", facebook: "https://example.com/x" })).toEqual(["DISCORD_INVALID", "FACEBOOK_INVALID", "NAME_MISSING"]);
+  });
+
   it("the event schema accepts only known codes and drops anything else", () => {
     const parsed = clientEventSchema.safeParse({ type: "SUBMISSION_VALIDATION_FAILED", reasons: ["PHONE_INVALID"], phone: "01712345678" });
     expect(parsed.success).toBe(true);

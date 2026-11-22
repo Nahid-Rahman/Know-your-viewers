@@ -257,6 +257,14 @@ for (const [p, name] of [
   check(`admin page ${p.split("/").slice(-1)[0]} renders`, res?.status() === 200 && !(await admin.content()).includes("Unhandled Runtime Error"));
   await shot(admin, name);
 }
+for (const q of ["?includeTest=1", "?includeTest=1&phase=live"]) {
+  const res = await admin.goto(`${BASE}/researcher/experiments/${sess.experimentId}/streams${q}`, { waitUntil: "networkidle0" });
+  const html = await admin.content();
+  check(`admin: campaign-wide engagement groups render (${q})`, res?.status() === 200 && html.includes("whole campaign (") && html.includes("Started during the stream"));
+}
+await shot(admin, "admin-desktop-campaign-groups");
+await admin.goto(`${BASE}/researcher/experiments/${sess.experimentId}/streams/${sess.id}?phase=post`, { waitUntil: "networkidle0" });
+check("admin: session engagement groups filter by phase", (await admin.content()).includes("started in the selected phase"));
 await admin.setViewport(MOBILE);
 await admin.goto(`${BASE}/researcher/experiments/${sess.experimentId}/streams/${sess.id}`, { waitUntil: "networkidle0" });
 await shot(admin, "admin-mobile-session");
@@ -282,6 +290,40 @@ const heroImg = await home.$eval("section img", (i) => i.getAttribute("src")).ca
 check("admin photo upload appears in the homepage hero", Boolean(heroImg?.startsWith("/api/media/")), heroImg ?? "none");
 await shot(home, "desktop-07-home-with-photo", false);
 await home.close();
+
+// Config changes between page render and visit start: the page re-renders with
+// the new config and the visit starts; the Spin button must not stay disabled.
+{
+  const ctx = await browser.createBrowserContext();
+  const page = await ctx.newPage();
+  await page.setViewport(DESKTOP);
+  const cdp = await page.createCDPSession();
+  let swapped = false;
+  cdp.on("Fetch.requestPaused", async (e) => {
+    const isAction = e.request.method === "POST" && Object.keys(e.request.headers).some((h) => h.toLowerCase() === "next-action");
+    if (isAction && !swapped) {
+      swapped = true;
+      const cur = (await db.query(`SELECT "currentConfigId" c FROM stream_sessions WHERE id = $1`, [sess.id])).rows[0].c;
+      const next = (
+        await db.query(
+          `INSERT INTO session_configs SELECT (jsonb_populate_record(NULL::session_configs, to_jsonb(c) || jsonb_build_object('id', gen_random_uuid()::text, 'version', c.version + 100, 'createdAt', now()))).* FROM session_configs c WHERE id = $1 RETURNING id`,
+          [cur],
+        )
+      ).rows[0].id;
+      await db.query(`UPDATE stream_sessions SET "currentConfigId" = $1 WHERE id = $2`, [next, sess.id]);
+    }
+    await cdp.send("Fetch.continueRequest", { requestId: e.requestId });
+  });
+  await cdp.send("Fetch.enable", { patterns: [{ urlPattern: "*", requestStage: "Request" }] });
+  await page.goto(`${BASE}/`, { waitUntil: "domcontentloaded" });
+  const ok = await page
+    .waitForFunction(() => !document.querySelector("#spin button")?.hasAttribute("disabled"), { timeout: 25000 })
+    .then(() => true)
+    .catch(() => false);
+  const btn = await page.$eval("#spin button", (b) => b.textContent ?? "").catch(() => "");
+  check("config changed mid-start: page refreshes and Spin becomes usable", swapped && ok && /Spin the wheel/.test(btn), `${swapped} ${ok} ${btn}`);
+  await ctx.close();
+}
 
 // Closed and no-session public states.
 await db.query(`UPDATE stream_sessions SET "actualEndAt" = (now() AT TIME ZONE 'UTC') - interval '3 hours', "entryDeadlineAt" = (now() AT TIME ZONE 'UTC') - interval '1 hour' WHERE id = $1`, [sess.id]);

@@ -39,16 +39,12 @@ export const entryFormSchema = z
     ),
     ign: optionalText(FIELD_LIMITS.ign),
     // Both social contacts are optional and independent.
-    discord: optionalText(FIELD_LIMITS.discord),
-    facebook: optionalText(FIELD_LIMITS.facebook),
-  })
-  .superRefine((v, ctx) => {
-    if (v.discord && !DISCORD_RE.test(v.discord)) {
-      ctx.addIssue({ code: "custom", path: ["discord"], message: "Enter a Discord username (2–32 letters, digits, _ or .)." });
-    }
-    if (v.facebook && /^https?:/i.test(v.facebook) && !FACEBOOK_URL_RE.test(v.facebook)) {
-      ctx.addIssue({ code: "custom", path: ["facebook"], message: "Enter a facebook.com profile link or your profile name." });
-    }
+    // Field-level checks, so they are reported together with other errors.
+    discord: optionalText(FIELD_LIMITS.discord).refine((v) => !v || DISCORD_RE.test(v), "Enter a Discord username (2–32 letters, digits, _ or .)."),
+    facebook: optionalText(FIELD_LIMITS.facebook).refine(
+      (v) => !v || !/^https?:/i.test(v) || FACEBOOK_URL_RE.test(v),
+      "Enter a facebook.com profile link or your profile name.",
+    ),
   });
 
 export type EntryFormInput = z.input<typeof entryFormSchema>;

@@ -62,6 +62,17 @@ describe("platform-metric CSV import", () => {
       expect(r.errors.join(" ")).not.toContain("12.5");
     }
   });
+  it("rejects hex, exponent, binary, signed and decimal-looking numbers instead of converting them", () => {
+    for (const bad of ["0x10", "1e3", "0b11", "+5", "1.0", "1,23", " 12 3"]) {
+      const r = parseMetricsCsv(`${H}
+YouTube,Studio,2026-11-20T21:00,"${bad}",`);
+      expect([bad, r.ok]).toEqual([bad, false]);
+    }
+    const ok = parseMetricsCsv(`${H}
+YouTube,Studio,2026-11-20T21:00,"12,345",
+YouTube,Studio,2026-11-20T22:00,0,`);
+    expect(ok.ok && ok.rows.map((x) => x.views)).toEqual([12345, 0]);
+  });
   it("is all-or-nothing: one bad row means no rows are returned", () => {
     const r = parseMetricsCsv(`${H}\nYouTube,Studio,2026-11-20T21:00,1,\nYouTube,,2026-11-20T22:00,2,`);
     expect(r.ok).toBe(false);

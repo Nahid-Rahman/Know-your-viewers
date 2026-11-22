@@ -244,7 +244,8 @@ export async function purgeResearchData(actor: Actor, submissionId: string, opts
   const eventWhere = otherLiveSubmissions
     ? { submissionId }
     : { visitId: s.visitId, OR: [{ submissionId: null }, { submissionId }] };
-  const prizeEntitled = s.status === "CANONICAL" && !s.drawExcluded;
+  // Under-18 entrants are never drawn or contacted, so nothing is kept for them.
+  const prizeEntitled = s.status === "CANONICAL" && !s.drawExcluded && s.ageGroup !== "BELOW_18";
   const plan = {
     eventsToDelete: await prisma.studyEvent.count({ where: eventWhere }),
     optionalFieldsCleared: s.emailProvided || s.ignProvided || s.socialProvided,

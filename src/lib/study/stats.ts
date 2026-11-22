@@ -210,15 +210,45 @@ type GroupStats = {
  * public pages, per-route split) are compared; older homepage-only visits are
  * counted separately as `legacyVisits` and never pooled in.
  */
-export async function durationGroups(sessionIds: string[]) {
-  if (!sessionIds.length) return { comparableVisits: 0, legacyVisits: 0, groups: emptyGroups(), routes: emptyRoutes() };
-  const rows = await prisma.$queryRaw<{ id: string; ver: number; active: number; route: unknown; elapsed: number; submitted: boolean; reward: boolean }[]>`
-    SELECT v.id, v."measurementVersion" AS ver, v."activeMs" AS active, v."routeActiveMs" AS route,
+export const DURATION_PHASES = ["ALL", "PRE_STREAM", "LIVE", "POST_STREAM", "UNKNOWN"] as const;
+export type DurationPhase = (typeof DURATION_PHASES)[number];
+type VisitPhase = Exclude<DurationPhase, "ALL">;
+const emptyPhaseCounts = (): Record<VisitPhase, number> => ({ PRE_STREAM: 0, LIVE: 0, POST_STREAM: 0, UNKNOWN: 0 });
+
+/** Maps a `?phase=` value (live, post, pre, unknown) to a phase; anything else is ALL. */
+export function parseDurationPhase(v: unknown): DurationPhase {
+  const m: Record<string, DurationPhase> = { live: "LIVE", post: "POST_STREAM", pre: "PRE_STREAM", unknown: "UNKNOWN" };
+  return (typeof v === "string" && m[v]) || "ALL";
+}
+
+/**
+ * Visible-time groups for one session or a whole campaign (several sessions).
+ * `phase` keeps only visits that STARTED in that stream phase (by the
+ * session's recorded actual start/end, same rule as phaseSplit). `byPhase`
+ * always reports how the comparable visits split, before the filter.
+ */
+export async function durationGroups(sessionIds: string[], opts: { phase?: DurationPhase } = {}) {
+  const phase = opts.phase ?? "ALL";
+  if (!sessionIds.length) return { phase, comparableVisits: 0, legacyVisits: 0, byPhase: emptyPhaseCounts(), groups: emptyGroups(), routes: emptyRoutes() };
+  const sessions = new Map(
+    (await prisma.streamSession.findMany({ where: { id: { in: sessionIds } }, select: { id: true, actualStartAt: true, actualEndAt: true } })).map((s) => [s.id, s]),
+  );
+  const raw = await prisma.$queryRaw<
+    { id: string; sid: string; startedAt: Date; ver: number; active: number; route: unknown; elapsed: number; submitted: boolean; reward: boolean }[]
+  >`
+    SELECT v.id, v."streamSessionId" AS sid, v."startedAt", v."measurementVersion" AS ver, v."activeMs" AS active, v."routeActiveMs" AS route,
       (EXTRACT(EPOCH FROM (v."lastSeenAt" - v."startedAt")) * 1000)::float AS elapsed,
       EXISTS (SELECT 1 FROM submissions s WHERE s."visitId" = v.id) AS submitted,
       EXISTS (SELECT 1 FROM study_events e WHERE e."visitId" = v.id AND e.type::text = 'REWARD_SECTION_VIEWED') AS reward
     FROM visits v
     WHERE v."streamSessionId" = ANY(${sessionIds}::text[])`;
+  const withPhase = raw.map((r) => {
+    const s = sessions.get(r.sid);
+    return { ...r, phase: s ? analyticsPhase(s, r.startedAt) : ("UNKNOWN" as VisitPhase) };
+  });
+  const byPhase = emptyPhaseCounts();
+  for (const r of withPhase) if (r.ver >= 2) byPhase[r.phase]++;
+  const rows = phase === "ALL" ? withPhase : withPhase.filter((r) => r.phase === phase);
   const comparable = rows.filter((r) => r.ver >= 2);
   const routeMs = (r: (typeof rows)[number], k: PublicRouteKey) => {
     const v = (r.route as Record<string, unknown> | null)?.[k];
@@ -241,7 +271,7 @@ export async function durationGroups(sessionIds: string[]) {
       return [k, { visitsWithTime: seen.length, visible: describeDurations(seen.map((r) => routeMs(r, k) / 1000)) }];
     }),
   ) as Record<PublicRouteKey, { visitsWithTime: number; visible: ReturnType<typeof describeDurations> }>;
-  return { comparableVisits: comparable.length, legacyVisits: rows.length - comparable.length, groups, routes };
+  return { phase, comparableVisits: comparable.length, legacyVisits: rows.length - comparable.length, byPhase, groups, routes };
 }
 
 function emptyGroups(): GroupStats[] {

@@ -11,15 +11,31 @@ import { getStudySessions } from "@/lib/study/admin-queries";
 import { formatStudyTime } from "@/lib/study/time";
 import { eligibilityStats } from "@/lib/study/research-eligibility";
 import { EligibilityStatsCard } from "@/features/study-admin/eligibility-stats-card";
+import { EngagementGroupsCard } from "@/features/study-admin/engagement-groups-card";
+import { durationGroups, parseDurationPhase } from "@/lib/study/stats";
+import { prisma } from "@/lib/prisma";
 
 export default async function StreamsPage({ params, searchParams }: PageProps<"/researcher/experiments/[id]/streams">) {
   const { id } = await params;
-  const includeTest = (await searchParams).includeTest === "1";
+  const sp = await searchParams;
+  const includeTest = sp.includeTest === "1";
   await requireExperimentPage(id);
   const experiment = await getExperimentById(id);
   if (!experiment) notFound();
 
-  const [sessions, allStreamers, elStats] = await Promise.all([getStudySessions(id), getStreamers(), eligibilityStats({ experimentId: id, includeTest })]);
+  // Campaign-wide groups use the aggregate export's session scope: LIVE study sessions, plus TEST ones when included.
+  const studySessionIds = (
+    await prisma.streamSession.findMany({
+      where: { experimentId: id, sessionType: "STUDY", ...(includeTest ? {} : { collectionMode: "LIVE" }) },
+      select: { id: true },
+    })
+  ).map((s) => s.id);
+  const [sessions, allStreamers, elStats, groups] = await Promise.all([
+    getStudySessions(id),
+    getStreamers(),
+    eligibilityStats({ experimentId: id, includeTest }),
+    durationGroups(studySessionIds, { phase: parseDurationPhase(sp.phase) }),
+  ]);
   // Every non-inactive streamer can be picked; creating a session assigns
   // the streamer to this experiment automatically.
   const pickableStreamers = allStreamers.filter((s) => s.status !== "INACTIVE");
@@ -39,6 +55,14 @@ export default async function StreamsPage({ params, searchParams }: PageProps<"/
         <Link href={includeTest ? "?" : "?includeTest=1"} className="mt-1 inline-block text-xs text-primary underline">
           {includeTest ? "Show LIVE records only" : "Include TEST records in these counts"}
         </Link>
+      </div>
+
+      <div className="mb-4">
+        <EngagementGroupsCard
+          groups={groups}
+          scopeLabel={`whole campaign (${studySessionIds.length} ${includeTest ? "study" : "LIVE study"} session(s))`}
+          query={includeTest ? { includeTest: "1" } : {}}
+        />
       </div>
 
       {sessions.length === 0 ? (

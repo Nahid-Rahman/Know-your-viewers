@@ -11,10 +11,12 @@ import { useVisit } from "./visit-provider";
 export function useStudyVisit(opts: { refCode: string | null; renderedConfigId: string }) {
   const visit = useVisit();
   const { start } = visit;
-  const started = useRef(false);
+  // Keyed by the rendered config: once per config, so a refresh after a
+  // config change starts again instead of leaving the visit pending.
+  const startedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (started.current) return;
-    started.current = true;
+    if (startedFor.current === opts.renderedConfigId) return;
+    startedFor.current = opts.renderedConfigId;
     start({ refCode: opts.refCode, renderedConfigId: opts.renderedConfigId });
   }, [opts.refCode, opts.renderedConfigId, start]);
   return visit;

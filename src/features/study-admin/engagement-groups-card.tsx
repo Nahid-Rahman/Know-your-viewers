@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { attemptOutcomes, durationGroups } from "@/lib/study/stats";
 
 const GROUP_LABELS: Record<string, string> = {
@@ -16,20 +17,55 @@ const STAGE_LABELS: Record<string, string> = {
 const secs = (x: number | null) => (x === null ? "—" : x < 90 ? `${Math.round(x)} s` : `${(x / 60).toFixed(1)} min`);
 const pct = (x: number | null) => (x === null ? "—" : `${(x * 100).toFixed(1)}%`);
 
+const PHASE_LINKS: [string, string, string | null][] = [
+  ["ALL", "All visits", null],
+  ["LIVE", "Started during the stream", "live"],
+  ["POST_STREAM", "Started after the stream", "post"],
+  ["PRE_STREAM", "Before the stream", "pre"],
+  ["UNKNOWN", "Phase unknown", "unknown"],
+];
+
 export function EngagementGroupsCard({
   groups,
   attempts,
+  scopeLabel,
+  query = {},
 }: {
   groups: Awaited<ReturnType<typeof durationGroups>>;
-  attempts: Awaited<ReturnType<typeof attemptOutcomes>>;
+  attempts?: Awaited<ReturnType<typeof attemptOutcomes>>;
+  scopeLabel: string;
+  /** Other search params to keep on the phase links. */
+  query?: Record<string, string>;
 }) {
+  const href = (p: string | null) => {
+    const q = new URLSearchParams(query);
+    if (p) q.set("phase", p);
+    const s = q.toString();
+    return s ? `?${s}` : "?";
+  };
   return (
     <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
-      <h2 className="mb-1 font-display text-lg font-bold">Engagement by furthest stage</h2>
+      <h2 className="mb-1 font-display text-lg font-bold">Engagement by furthest stage — {scopeLabel}</h2>
+      <nav aria-label="Stream phase" className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+        {PHASE_LINKS.map(([key, label, p]) => {
+          const n = key === "ALL" ? null : groups.byPhase[key as keyof typeof groups.byPhase];
+          const text = `${label}${n !== null ? ` (${n})` : ""}`;
+          return groups.phase === key ? (
+            <span key={key} aria-current="true" className="font-semibold">
+              {text}
+            </span>
+          ) : (
+            <Link key={key} href={href(p)} scroll={false} className="text-primary underline">
+              {text}
+            </Link>
+          );
+        })}
+      </nav>
       <p className="mb-3 text-xs text-muted-foreground">
         Per <strong>visit</strong> (not person). Each visit is in one group. Visible time is an estimate of time the public pages were on screen
         (heartbeat-credited); elapsed time runs from first to last signal. Neither measures attention or reading. Based on{" "}
         {groups.comparableVisits} visit(s) measured on all public pages
+        {groups.phase !== "ALL" ? " that started in the selected phase (by recorded actual start/end)" : ""}
         {groups.legacyVisits > 0 ? `; ${groups.legacyVisits} older homepage-only visit(s) are left out so definitions aren't mixed` : ""}.
       </p>
       <div className="overflow-x-auto">
@@ -71,6 +107,8 @@ export function EngagementGroupsCard({
           .join(" · ")}
       </p>
 
+      {attempts && (
+        <>
       <h3 className="mt-4 mb-1 text-sm font-semibold">Submit attempts</h3>
       <p className="mb-2 text-xs text-muted-foreground">
         Since 2026-11-22 every press of Submit is counted, including ones that fail the form checks. Earlier data counted only valid
@@ -87,6 +125,8 @@ export function EngagementGroupsCard({
         <p className="mt-1 text-xs text-muted-foreground">
           Form-check reasons (attempts can have several): {attempts.validationReasons.map((r) => `${r.reason.toLowerCase().replace(/_/g, " ")} ${r.attempts}`).join(" · ")}
         </p>
+      )}
+        </>
       )}
     </section>
   );
