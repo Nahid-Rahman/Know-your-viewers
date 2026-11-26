@@ -82,6 +82,20 @@ async function main() {
           title: "Minecraft",
           description: "Sandbox survival and building category for PC streams.",
         },
+        {
+          icon: "⚽",
+          image: "/images/categories/fc-football.jpg",
+          tag: "CONSOLE POOL",
+          title: "FC 26",
+          description: "Football sim category for match-day livestream viewers.",
+        },
+        {
+          icon: "🌴",
+          image: "/images/categories/gta-open-world.jpg",
+          tag: "CONSOLE POOL",
+          title: "GTA VI",
+          description: "Open-world action category for livestream viewers.",
+        },
       ],
       rewardPool: [
         { label: "Bonus Credit Token", sub: "Digital", rarity: "rare" },
