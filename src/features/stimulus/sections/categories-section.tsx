@@ -6,9 +6,11 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { EyebrowLabel } from "@/components/common/eyebrow-label";
 import { cn } from "@/lib/utils";
 
-const AUTO_SCROLL_INTERVAL_MS = 4000;
-// Any manual interaction (click, drag, hover) pauses auto-scroll for this long.
-const RESUME_DELAY_MS = 6000;
+// The carousel advances one card every 3 seconds. Hovering does not pause it;
+// a click or swipe only restarts the 3-second count from that card.
+const AUTO_SCROLL_INTERVAL_MS = 3000;
+// How often the auto-advance timer checks whether the interval has elapsed.
+const TICK_MS = 100;
 // How long scrolling must be idle before we treat it as settled and, if it
 // ended on a cloned copy, quietly jump back to the matching real card.
 const SETTLE_DELAY_MS = 150;
@@ -50,9 +52,9 @@ export function CategoriesSection({ gameCategories }: { gameCategories: GameCate
   const [active, setActive] = useState(0);
   // Slot (index across all rendered copies) currently in the middle.
   const slotRef = useRef(realStart);
-  // Timestamp until which auto-scroll should stay paused — a ref so ticking
-  // it doesn't cause re-renders.
-  const pausedUntilRef = useRef(0);
+  // When the carousel last moved (auto or manual) — a ref so updating it
+  // doesn't cause re-renders.
+  const lastMoveRef = useRef(0);
 
   function cardsOf(track: HTMLElement) {
     return Array.from(track.querySelectorAll<HTMLElement>("[data-category-card]"));
@@ -82,11 +84,11 @@ export function CategoriesSection({ gameCategories }: { gameCategories: GameCate
     scrollToSlot(slot - (slot % count) + index);
   }
 
-  function pauseAutoScroll() {
+  function restartTimer() {
     // Only ever invoked from event handlers/effects, never during render —
     // safe despite the impure-call lint rule being conservative here.
     // eslint-disable-next-line react-hooks/purity
-    pausedUntilRef.current = Date.now() + RESUME_DELAY_MS;
+    lastMoveRef.current = Date.now();
   }
 
   useEffect(() => {
@@ -140,10 +142,10 @@ export function CategoriesSection({ gameCategories }: { gameCategories: GameCate
     }
 
     track.addEventListener("scroll", onScroll, { passive: true });
-    track.addEventListener("pointerdown", pauseAutoScroll);
+    track.addEventListener("pointerdown", restartTimer);
     return () => {
       track.removeEventListener("scroll", onScroll);
-      track.removeEventListener("pointerdown", pauseAutoScroll);
+      track.removeEventListener("pointerdown", restartTimer);
       if (frame !== null) cancelAnimationFrame(frame);
       if (settleTimer !== null) clearTimeout(settleTimer);
     };
@@ -151,15 +153,17 @@ export function CategoriesSection({ gameCategories }: { gameCategories: GameCate
   }, [count]);
 
   // Auto-advance one card at a time, skipped for prefers-reduced-motion and
-  // paused for a while after any manual interaction.
+  // restarted from zero after a click or swipe (hover has no effect).
   useEffect(() => {
     if (!looping) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
+    restartTimer();
     const id = setInterval(() => {
-      if (Date.now() < pausedUntilRef.current) return;
+      if (Date.now() - lastMoveRef.current < AUTO_SCROLL_INTERVAL_MS) return;
+      restartTimer();
       go(1);
-    }, AUTO_SCROLL_INTERVAL_MS);
+    }, TICK_MS);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [count]);
@@ -182,7 +186,6 @@ export function CategoriesSection({ gameCategories }: { gameCategories: GameCate
 
       <div
         ref={trackRef}
-        onMouseEnter={pauseAutoScroll}
         className="scrollbar-none flex snap-x snap-mandatory gap-5 overflow-x-auto pb-2"
       >
         {slots.map(({ cat, i, copy }) => {
@@ -218,7 +221,7 @@ export function CategoriesSection({ gameCategories }: { gameCategories: GameCate
             type="button"
             aria-label="Previous category"
             onClick={() => {
-              pauseAutoScroll();
+              restartTimer();
               go(-1);
             }}
             className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-foreground"
@@ -232,7 +235,7 @@ export function CategoriesSection({ gameCategories }: { gameCategories: GameCate
                 type="button"
                 aria-label={`Show ${cat.title}`}
                 onClick={() => {
-                  pauseAutoScroll();
+                  restartTimer();
                   goToCategory(i);
                 }}
                 className={cn(
@@ -246,7 +249,7 @@ export function CategoriesSection({ gameCategories }: { gameCategories: GameCate
             type="button"
             aria-label="Next category"
             onClick={() => {
-              pauseAutoScroll();
+              restartTimer();
               go(1);
             }}
             className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-foreground"
