@@ -82,7 +82,7 @@ export default async function SubmissionReceivedPage({ searchParams }: PageProps
           label="Response code"
           value={submission.responseCode}
           copyable
-          hint="Keep this code. The research team may ask for it if they contact you. It does not give access to your details."
+          hint="Keep this code. The campaign team may ask for it if they contact you. It does not give access to your details."
         />
 
         <div className="mt-4 rounded-xl border border-border">
