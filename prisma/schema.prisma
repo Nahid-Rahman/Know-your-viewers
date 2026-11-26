@@ -1115,6 +1115,11 @@ model Submission {
   socialProvided    Boolean            @default(false)
   discordProvided   Boolean            @default(false)
   facebookProvided  Boolean            @default(false)
+  // Optional one-question poll on the confirmation page, asked after the
+  // entry is saved (not part of the entry form). A featured-game title as
+  // shown at answer time, or "Other". Null = not answered.
+  favoriteGame      String?
+  favoriteGameAt    DateTime?
   status            SubmissionStatus
   canonicalId       String?
   submittedAt       DateTime           @default(now())

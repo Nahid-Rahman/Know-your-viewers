@@ -122,13 +122,13 @@ export async function buildStudyExport(actor: Actor, type: StudyExportType, expe
     headers = [
       "study_id", "session_id", "streamer", "session_title", "attribution", "phase", "submitted_at", "age_group",
       "email_provided", "ign_provided", "social_provided", "discord_provided", "facebook_provided", "spin_result", "spin_mechanism",
-      "visit_elapsed_seconds", "visit_active_seconds_estimate", "follow_up_status", "is_test",
+      "favorite_game", "visit_elapsed_seconds", "visit_active_seconds_estimate", "follow_up_status", "is_test",
     ];
     rows = subs.map((s) => [
       s.id, s.streamSessionId, s.streamSession.streamer.displayName, s.streamSession.streamTitle, s.attributionSource,
       analyticsPhase(s.streamSession, s.submittedAt), s.submittedAt, AGE_GROUP_LABELS[s.ageGroup], s.emailProvided,
       s.ignProvided, s.socialProvided, s.discordProvided, s.facebookProvided, s.spinOutcome?.resultKey ?? "", s.spinOutcome?.mechanism ?? "",
-      Math.round((s.visit.lastSeenAt.getTime() - s.visit.startedAt.getTime()) / 1000), Math.round(s.visit.activeMs / 1000),
+      s.favoriteGame ?? "", Math.round((s.visit.lastSeenAt.getTime() - s.visit.startedAt.getTime()) / 1000), Math.round(s.visit.activeMs / 1000),
       s.followUp?.status ?? "NOT_CONTACTED", s.isTest,
     ]);
   } else if (type === "research-interviews") {

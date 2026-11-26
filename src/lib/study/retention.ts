@@ -82,6 +82,9 @@ export async function retentionRun(actor: Actor, experimentId: string, opts: { d
         OR: [{ encryptedEmail: { not: null } }, { encryptedIgn: { not: null } }, { encryptedSocial: { not: null } }, { encryptedDiscord: { not: null } }, { encryptedFacebook: { not: null } }],
       }
     : null;
+  const pollWhere = optionalCutoff
+    ? { experimentId, submittedAt: { lt: optionalCutoff }, favoriteGame: { not: null } }
+    : null;
   const eventWhere = eventCutoff ? { experimentId, occurredAt: { lt: eventCutoff } } : null;
   const support = supportCutoff ? await campaignSupportPurgeCandidates(prisma, experimentId, supportCutoff) : { ids: [], unassigned: 0 };
 
@@ -91,6 +94,8 @@ export async function retentionRun(actor: Actor, experimentId: string, opts: { d
     phonesToRemove: phoneIds.length,
     phonesHeldForUnpaidWinners: phoneTargets.length - phoneIds.length,
     optionalFieldRowsToClear: optionalWhere ? await prisma.submissionContact.count({ where: optionalWhere }) : 0,
+    // The confirmation-page poll answer follows the optional-field retention period.
+    pollAnswersToClear: pollWhere ? await prisma.submission.count({ where: pollWhere }) : 0,
     eventsToDelete: eventWhere ? await prisma.studyEvent.count({ where: eventWhere }) : 0,
     // Only requests whose response code links them to this campaign.
     supportRequestsToPurge: support.ids.length,
@@ -118,6 +123,7 @@ export async function retentionRun(actor: Actor, experimentId: string, opts: { d
         data: { encryptedEmail: null, encryptedIgn: null, encryptedSocial: null, encryptedDiscord: null, encryptedFacebook: null, optionalPurgedAt: now },
       });
     }
+    if (pollWhere) await tx.submission.updateMany({ where: pollWhere, data: { favoriteGame: null, favoriteGameAt: null } });
     if (eventWhere) await tx.studyEvent.deleteMany({ where: eventWhere });
     if (supportCutoff) {
       // Re-select inside the transaction with the same scoped rule.

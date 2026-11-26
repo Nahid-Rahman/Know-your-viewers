@@ -110,6 +110,16 @@ Removed from the new form: streamer dropdown, "Stream Nickname", favourite game
 type, livestream frequency. Their historical values remain in the legacy
 tables.
 
+Optional confirmation-page poll (added 2026-11-26, not part of the form):
+after the entry is saved, the confirmation page asks "Which game are you most
+excited about right now?" with the featured game titles (CMS → Featured game
+categories) plus "Other". One tap, one answer per submission, only from the
+submitting browser. Not shown to under-18 entrants. Stored as
+`submissions.favoriteGame` / `favoriteGameAt`; exported as `favorite_game` in
+the research-submissions export; cleared by a research-data purge and by the
+optional-field retention period. The entry form's field count and
+optional-field rates are unaffected.
+
 ## 4. Decisions still pending (shown in the panel under *Decisions & Access*)
 
 None of these are chosen by the software. LIVE collection is blocked until

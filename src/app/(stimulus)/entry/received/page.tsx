@@ -9,6 +9,8 @@ import { AGE_GROUP_LABELS, DRAW_TIMING_COPY } from "@/lib/study/constants";
 import { maskPhone } from "@/lib/study/phone";
 import { parseRewardConfig } from "@/lib/study/reward";
 import { recordStudyEvent } from "@/lib/study/events";
+import { favoriteGameChoices } from "@/lib/study/favorite-game";
+import { FavoriteGamePoll } from "@/features/study/favorite-game-poll";
 import { findVisitorByToken, VISITOR_COOKIE } from "@/lib/study/visits";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +49,9 @@ export default async function SubmissionReceivedPage({ searchParams }: PageProps
 
   await recordStudyEvent(prisma, submission.visit, { type: "CONFIRMATION_VIEWED", submissionId: submission.id }).catch(() => {});
   const reward = parseRewardConfig(submission.config.rewardConfig);
+  // Optional poll; not asked of under-18 entrants or after research data was removed.
+  const showPoll = submission.ageGroup !== "BELOW_18" && !submission.researchDataPurgedAt;
+  const pollChoices = showPoll ? await favoriteGameChoices() : [];
   const details: [string, string][] = [
     ["Phone", maskPhone(submission.contact?.phoneTail)],
     ["Age group", AGE_GROUP_LABELS[submission.ageGroup]],
@@ -98,6 +103,10 @@ export default async function SubmissionReceivedPage({ searchParams }: PageProps
             ))}
           </dl>
         </div>
+
+        {showPoll && pollChoices.length > 1 && (
+          <FavoriteGamePoll submissionId={submission.id} choices={pollChoices} initialAnswer={submission.favoriteGame} />
+        )}
 
         <p className="mt-4 text-xs text-muted-foreground">
           Each phone number counts once in the draw for this campaign. Additional entries are kept for review but do not add chances.

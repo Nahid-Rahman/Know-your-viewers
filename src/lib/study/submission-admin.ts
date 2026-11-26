@@ -248,7 +248,7 @@ export async function purgeResearchData(actor: Actor, submissionId: string, opts
   const prizeEntitled = s.status === "CANONICAL" && !s.drawExcluded && s.ageGroup !== "BELOW_18";
   const plan = {
     eventsToDelete: await prisma.studyEvent.count({ where: eventWhere }),
-    optionalFieldsCleared: s.emailProvided || s.ignProvided || s.socialProvided,
+    optionalFieldsCleared: s.emailProvided || s.ignProvided || s.socialProvided || s.favoriteGame !== null,
     phoneKeptForPrize: prizeEntitled,
   };
   if (opts.dryRun) return plan;
@@ -267,7 +267,7 @@ export async function purgeResearchData(actor: Actor, submissionId: string, opts
         ...(prizeEntitled ? {} : { encryptedName: null, encryptedPhone: null, phonePurgedAt: new Date() }),
       },
     });
-    await tx.submission.update({ where: { id: submissionId }, data: { researchDataPurgedAt: new Date() } });
+    await tx.submission.update({ where: { id: submissionId }, data: { researchDataPurgedAt: new Date(), favoriteGame: null, favoriteGameAt: null } });
     await audit(tx, {
       actorId: actor.id,
       action: "RESEARCH_DATA_PURGED",

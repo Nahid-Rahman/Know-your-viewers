@@ -3,6 +3,7 @@
 import { cookies, headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { clientEventSchema, recordStudyEvent } from "@/lib/study/events";
+import { answerFavoriteGame, type FavoriteGameResult } from "@/lib/study/favorite-game";
 import { allowRequest, PUBLIC_LIMITS } from "@/lib/study/rate-limit";
 import { spinForVisit, submitEntryForVisit, type SubmitResult } from "@/lib/study/submissions";
 import {
@@ -123,4 +124,13 @@ export async function submitStudyEntry(input: { visitId: string; idempotencyKey:
     idempotencyKey: String(input.idempotencyKey ?? ""),
     values: input.values,
   });
+}
+
+/** Optional confirmation-page poll; see src/lib/study/favorite-game.ts. */
+export async function submitFavoriteGame(input: { submissionId: string; choice: string }): Promise<FavoriteGameResult> {
+  const visitor = await currentVisitor();
+  if (!visitor) return { ok: false, error: "Please reload the page." };
+  const { limit, windowMs } = PUBLIC_LIMITS.favoriteGamePerVisitor;
+  if (!(await allowRequest("favorite-game", visitor.id, limit, windowMs))) return { ok: false, error: "Too many requests — please wait a moment." };
+  return answerFavoriteGame(visitor.id, String(input?.submissionId ?? ""), input?.choice);
 }

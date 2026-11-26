@@ -141,6 +141,7 @@ export default async function SubmissionDetailPage({ params }: PageProps<"/resea
               {s.contact?.optionalPurgedAt ? " (values removed)" : ""}
             </Row>
             <Row label="Wheel result">{s.spinOutcome ? `${s.spinOutcome.resultLabel} (${s.spinOutcome.mechanism.toLowerCase()})` : "no spin"}</Row>
+            <Row label="Poll: most excited about">{s.favoriteGame ?? "not answered"}</Row>
           </dl>
           {s.duplicates.length > 0 && (
             <p className="mt-3 text-sm">
