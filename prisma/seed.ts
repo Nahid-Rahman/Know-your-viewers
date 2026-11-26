@@ -84,14 +84,14 @@ async function main() {
         },
         {
           icon: "⚽",
-          image: "/images/categories/fc-football.jpg",
+          image: "/images/categories/fc-26.jpg",
           tag: "CONSOLE POOL",
           title: "FC 26",
           description: "Football sim category for match-day livestream viewers.",
         },
         {
           icon: "🌴",
-          image: "/images/categories/gta-open-world.jpg",
+          image: "/images/categories/gta-vi.jpg",
           tag: "CONSOLE POOL",
           title: "GTA VI",
           description: "Open-world action category for livestream viewers.",
