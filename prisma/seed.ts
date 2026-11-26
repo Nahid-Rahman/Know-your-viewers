@@ -84,7 +84,7 @@ async function main() {
         },
         {
           icon: "⚽",
-          image: "/images/categories/fc-26.jpg",
+          image: "/images/categories/fc-26-street.jpg",
           tag: "CONSOLE POOL",
           title: "FC 26",
           description: "Football sim category for match-day livestream viewers.",
